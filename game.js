@@ -354,6 +354,15 @@
   const keys = {};
   let firing = false;
 
+  /* ---------- 设备 / 输入适配 ---------- */
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  document.body.classList.toggle('touch', isTouch);
+  const touch = { f: 0, s: 0, sprint: false };   // 虚拟摇杆输入
+  let pointerLocked = false;
+  let lockSupported = true;
+  const lookDrag = { id: null, x: 0, y: 0, moved: 0 };
+  let aimTouchId = null, aimLastX = 0, aimLastY = 0;
+
   // 根节点（含移动/摆头）
   const playerRoot = new THREE.Group();
   playerRoot.position.copy(player.pos);
@@ -816,7 +825,13 @@
     document.exitPointerLock && document.exitPointerLock();
   }
 
-  /* ---------- 输入 ---------- */
+  /* ---------- 输入（键盘 + 鼠标/触摸，兼容指针锁定失败） ---------- */
+  function setLook(dx, dy) {
+    player.yaw += dx * 0.0024;
+    player.pitch -= dy * 0.0024;
+    player.pitch = Math.max(-0.5, Math.min(1.15, player.pitch));
+  }
+
   window.addEventListener('keydown', function (e) {
     keys[e.code] = true;
     if (e.code === 'KeyR') startReload();
@@ -825,30 +840,145 @@
     if (e.code === 'Digit3') switchWeapon('shotgun');
     if (e.code === 'KeyQ') cycleWeapon(1);
     if (e.code === 'Space') tryDodge();
+    if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
   window.addEventListener('keyup', function (e) {
     keys[e.code] = false;
   });
+
+  // 鼠标：锁定状态下用移动增量；未锁定（Safari/iframe 失败）用拖拽瞄准 + 按住射击
   window.addEventListener('mousedown', function (e) {
     if (e.button !== 0) return;
-    if (!gameStarted || !running) return;
-    firing = true;
-    if (!currentCfg().auto) tryFire();
-  });
-  window.addEventListener('mouseup', function (e) {
-    if (e.button === 0) firing = false;
+    if (!gameStarted || !running || !player.alive) return;
+    if (pointerLocked) {
+      firing = true;
+      if (!currentCfg().auto) tryFire();
+    } else if (!isTouch) {
+      lookDrag.id = 1;
+      lookDrag.x = e.clientX;
+      lookDrag.y = e.clientY;
+      lookDrag.moved = 0;
+      firing = true;
+      if (!currentCfg().auto) tryFire();
+    }
   });
   window.addEventListener('mousemove', function (e) {
-    if (!running) return;
-    const sx = e.movementX || 0, sy = e.movementY || 0;
-    player.yaw += sx * 0.0024;
-    player.pitch -= sy * 0.0024;
-    player.pitch = Math.max(-0.5, Math.min(1.15, player.pitch));
+    if (!running || !player.alive) return;
+    if (pointerLocked) {
+      setLook(e.movementX || 0, e.movementY || 0);
+    } else if (!isTouch && lookDrag.id) {
+      const dx = e.clientX - lookDrag.x;
+      const dy = e.clientY - lookDrag.y;
+      lookDrag.moved += Math.abs(dx) + Math.abs(dy);
+      if (lookDrag.moved > 6) { firing = false; setLook(dx, dy); }
+      lookDrag.x = e.clientX; lookDrag.y = e.clientY;
+    }
+  });
+  window.addEventListener('mouseup', function (e) {
+    if (e.button !== 0) return;
+    if (pointerLocked || !isTouch) firing = false;
+    if (!isTouch) lookDrag.id = null;
   });
   window.addEventListener('wheel', function (e) {
     if (!running) return;
     if (Math.abs(e.deltaY) > 5) cycleWeapon(e.deltaY > 0 ? 1 : -1);
   }, { passive: true });
+
+  /* ---------- 触摸控制（iOS / Android） ---------- */
+  const joyBase = document.getElementById('joystick');
+  const joyKnob = document.getElementById('joystick-knob');
+  const aimZone = document.getElementById('aim-zone');
+  const fireBtn = document.getElementById('fire-btn');
+  let joyId = null, joyCenterX = 0, joyCenterY = 0;
+  const JOY_R = 56;
+
+  function joyMove(x, y) {
+    let dx = x - joyCenterX, dy = y - joyCenterY;
+    const len = Math.hypot(dx, dy) || 1;
+    if (len > JOY_R) { dx = dx / len * JOY_R; dy = dy / len * JOY_R; }
+    joyKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    touch.f = -dy / JOY_R;
+    touch.s = dx / JOY_R;
+  }
+  function joyReset() {
+    if (joyKnob) joyKnob.style.transform = 'translate(0px,0px)';
+    touch.f = 0; touch.s = 0; joyId = null;
+  }
+  if (joyBase) {
+    joyBase.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      joyId = t.identifier;
+      const r = joyBase.getBoundingClientRect();
+      joyCenterX = r.left + r.width / 2;
+      joyCenterY = r.top + r.height / 2;
+      joyMove(t.clientX, t.clientY);
+    }, { passive: false });
+    joyBase.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === joyId) joyMove(t.clientX, t.clientY);
+      }
+    }, { passive: false });
+    joyBase.addEventListener('touchend', function (e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joyId) joyReset();
+      }
+    });
+    joyBase.addEventListener('touchcancel', joyReset);
+  }
+
+  if (aimZone) {
+    aimZone.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      aimTouchId = t.identifier;
+      aimLastX = t.clientX; aimLastY = t.clientY;
+    }, { passive: false });
+    aimZone.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === aimTouchId) {
+          setLook(t.clientX - aimLastX, t.clientY - aimLastY);
+          aimLastX = t.clientX; aimLastY = t.clientY;
+        }
+      }
+    }, { passive: false });
+    aimZone.addEventListener('touchend', function (e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === aimTouchId) aimTouchId = null;
+      }
+    });
+  }
+
+  if (fireBtn) {
+    fireBtn.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      if (!gameStarted || !running || !player.alive) return;
+      firing = true;
+      if (!currentCfg().auto) tryFire();
+    }, { passive: false });
+    fireBtn.addEventListener('touchend', function (e) { e.preventDefault(); firing = false; }, { passive: false });
+    fireBtn.addEventListener('touchcancel', function () { firing = false; });
+  }
+
+  function bindBtn(id, fn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('touchstart', function (e) { e.preventDefault(); fn(); }, { passive: false });
+  }
+  bindBtn('btn-weapon', function () { cycleWeapon(1); });
+  bindBtn('btn-reload', function () { startReload(); });
+  bindBtn('btn-dodge', function () { tryDodge(); });
+  bindBtn('btn-pause', function () { togglePause(); });
+  bindBtn('btn-sprint', function () { touch.sprint = true; });
+  const sprintBtn = document.getElementById('btn-sprint');
+  if (sprintBtn) {
+    sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
+    sprintBtn.addEventListener('touchcancel', function () { touch.sprint = false; });
+  }
 
   // 翻滚
   let dodgeT = 0, dodgeCd = 0;
@@ -865,35 +995,61 @@
     dustPuff(player.pos.clone().add(new THREE.Vector3(0, 0.2, 0)), 10, true);
   }
 
-  /* ---------- 指针锁定 ---------- */
+  /* ---------- 暂停 / 指针锁定 / 全屏 ---------- */
+  function requestLock() {
+    if (isTouch || !lockSupported) return;
+    try {
+      const p = canvas.requestPointerLock && canvas.requestPointerLock();
+      if (p && p.catch) p.catch(function () { lockSupported = false; });
+    } catch (err) { lockSupported = false; }
+  }
+  function enterFullscreen() {
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (err) {}
+  }
+  function pauseGame() {
+    if (!gameStarted || !player.alive) return;
+    running = false;
+    firing = false;
+    pauseOverlay.classList.remove('hidden');
+  }
+  function resumeGame() {
+    if (!gameStarted || !player.alive) return;
+    running = true;
+    pauseOverlay.classList.add('hidden');
+    if (!isTouch) requestLock();
+  }
+  function togglePause() {
+    if (running) pauseGame(); else resumeGame();
+  }
+
   document.addEventListener('pointerlockchange', function () {
-    const locked = document.pointerLockElement === canvas;
-    if (locked) {
-      if (!gameStarted) return;
+    pointerLocked = (document.pointerLockElement === canvas || document.webkitPointerLockElement === canvas);
+    if (pointerLocked && gameStarted && player.alive) {
       running = true;
       pauseOverlay.classList.add('hidden');
-    } else {
-      if (gameStarted && player.alive) {
-        running = false;
-        firing = false;
-        pauseOverlay.classList.remove('hidden');
-      }
     }
   });
 
   startBtn.addEventListener('click', function () {
     ensureAudio();
     startGame();
-    canvas.requestPointerLock();
+    running = true;
+    pauseOverlay.classList.add('hidden');
+    if (isTouch) enterFullscreen(); else requestLock();
   });
   resumeBtn.addEventListener('click', function () {
     ensureAudio();
-    canvas.requestPointerLock();
+    resumeGame();
   });
   restartBtn.addEventListener('click', function () {
     ensureAudio();
     startGame();
-    canvas.requestPointerLock();
+    running = true;
+    if (isTouch) enterFullscreen(); else requestLock();
   });
 
   window.addEventListener('resize', function () {
@@ -937,15 +1093,17 @@
     if (!player.alive) return;
 
     // 体力恢复
-    const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+    const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touch.sprint;
     if (!sprinting && dodgeT <= 0) player.stamina = Math.min(100, player.stamina + 16 * dt);
 
-    // 输入方向
-    let f = 0, s = 0;
+    // 输入方向（键盘 + 触摸摇杆）
+    let f = touch.f, s = touch.s;
     if (keys['KeyW'] || keys['ArrowUp']) f += 1;
     if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
     if (keys['KeyD'] || keys['ArrowRight']) s += 1;
     if (keys['KeyA'] || keys['ArrowLeft']) s -= 1;
+    f = Math.max(-1, Math.min(1, f));
+    s = Math.max(-1, Math.min(1, s));
 
     fwd.set(Math.sin(player.yaw), 0, Math.cos(player.yaw));
     right.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));

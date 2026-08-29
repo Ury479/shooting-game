@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>3D 射击游戏 · 火力前线</title>
 <style>
   :root{
@@ -11,8 +11,8 @@
     --ok:#6dff8a;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:100%;height:100%;overflow:hidden;background:#0a0d14;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#eaf2ff;user-select:none;}
-  #game{position:fixed;inset:0;display:block;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0d14;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#eaf2ff;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none;}
+  #game{position:fixed;inset:0;display:block;touch-action:none;}
   #game:focus{outline:none;}
 
   /* HUD */
@@ -66,6 +66,36 @@
   #start-btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(53,224,255,.45);}
   #final-score{font-size:54px;font-weight:900;color:#ffd166;margin:6px 0;}
   .stats-line{color:#9fb4d8;font-size:15px;letter-spacing:1px;}
+
+  /* ---------- 触摸 / 移动端（iOS / Android） ---------- */
+  #touch-ui{position:fixed;inset:0;z-index:7;pointer-events:none;display:none;}
+  body.touch #touch-ui{display:block;}
+  .tbtn{position:absolute;pointer-events:auto;z-index:8;border:1px solid rgba(140,190,255,.4);border-radius:50%;background:rgba(12,18,32,.55);color:#eaf2ff;font-weight:700;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;backdrop-filter:blur(4px);}
+  .tbtn:active{background:rgba(53,224,255,.35);}
+  #joystick{position:absolute;left:26px;bottom:26px;width:128px;height:128px;border-radius:50%;border:1px solid rgba(140,190,255,.35);background:rgba(12,18,32,.35);pointer-events:auto;z-index:7;touch-action:none;}
+  #joystick .knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(53,224,255,.55);border:1px solid rgba(255,255,255,.4);}
+  #aim-zone{position:absolute;right:0;top:0;bottom:0;width:60%;pointer-events:auto;z-index:7;touch-action:none;}
+  #fire-btn{right:30px;bottom:140px;width:88px;height:88px;font-size:16px;background:rgba(255,77,94,.68);border-color:rgba(255,120,140,.8);}
+  #btn-dodge{right:140px;bottom:34px;width:60px;height:60px;font-size:13px;}
+  #btn-weapon{right:140px;bottom:102px;width:60px;height:60px;font-size:13px;}
+  #btn-reload{right:210px;bottom:34px;width:60px;height:60px;font-size:13px;}
+  #btn-sprint{right:210px;bottom:102px;width:60px;height:60px;font-size:13px;}
+  #btn-pause{right:16px;bottom:16px;width:48px;height:48px;font-size:13px;}
+  #touch-hint{display:none;color:#7fffd4;font-size:14px;letter-spacing:1px;margin:14px 0 6px;}
+  body.touch #touch-hint{display:block;}
+  body.touch .controls{display:none;}
+  @media (max-width:760px){
+    #top-left,#top-right{min-width:150px;padding:8px 10px;}
+    #top-right{top:12px;right:12px;}
+    #top-left{top:12px;left:12px;}
+    #bottom-center{bottom:auto;top:96px;left:50%;transform:translateX(-50%);gap:8px;font-size:11px;padding:8px 10px;}
+    #bottom-center .label{display:none;}
+    #weapon-name{font-size:15px;}
+    #ammo{font-size:24px;}
+    #wave-banner{font-size:30px;top:20%;}
+    .card{padding:24px 20px;}
+    .card h1{font-size:28px;}
+  }
 </style>
 </head>
 <body>
@@ -118,6 +148,7 @@
       <div><span>翻滚闪避</span><span class="k">空格</span></div>
       <div><span>暂停</span><span class="k">Esc</span></div>
     </div>
+    <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
     <button id="start-btn">开 始 游 戏</button>
   </div>
 </div>
@@ -137,6 +168,17 @@
     <div class="stats-line">坚持到第 <span id="final-wave">1</span> 波 · 击杀 <span id="final-kills">0</span> 个敌人</div>
     <button id="restart-btn" style="margin-top:22px;padding:12px 40px;background:linear-gradient(90deg,#ff4d5e,#ffd166);border:none;border-radius:12px;font-size:18px;font-weight:800;color:#1a0a0a;cursor:pointer;letter-spacing:3px;">重新开始</button>
   </div>
+</div>
+
+<div id="touch-ui">
+  <div id="joystick"><div class="knob" id="joystick-knob"></div></div>
+  <div id="aim-zone"></div>
+  <button class="tbtn" id="fire-btn">开火</button>
+  <button class="tbtn" id="btn-weapon">换枪</button>
+  <button class="tbtn" id="btn-reload">换弹</button>
+  <button class="tbtn" id="btn-dodge">翻滚</button>
+  <button class="tbtn" id="btn-sprint">冲刺</button>
+  <button class="tbtn" id="btn-pause">暂停</button>
 </div>
 
 <script src="vendor/three.min.js"></script>
