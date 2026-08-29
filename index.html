@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3D 射击游戏 · 火力前线</title>
+<style>
+  :root{
+    --accent:#35e0ff;
+    --danger:#ff4d5e;
+    --ok:#6dff8a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0d14;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#eaf2ff;user-select:none;}
+  #game{position:fixed;inset:0;display:block;}
+  #game:focus{outline:none;}
+
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5;}
+  .panel{position:absolute;background:rgba(10,16,28,.55);border:1px solid rgba(120,180,255,.18);border-radius:12px;backdrop-filter:blur(6px);padding:10px 14px;}
+  #top-left{top:16px;left:16px;min-width:210px;}
+  #top-right{top:16px;right:16px;min-width:230px;text-align:right;}
+  .bar-wrap{height:12px;background:rgba(255,255,255,.1);border-radius:6px;overflow:hidden;margin-top:6px;}
+  .bar{height:100%;width:100%;border-radius:6px;transition:width .15s ease;}
+  #hp-bar{background:linear-gradient(90deg,#ff4d5e,#ff8a5e);}
+  #st-bar{background:linear-gradient(90deg,#35e0ff,#7fffd4);}
+  .label{font-size:12px;opacity:.85;letter-spacing:1px;}
+  .value{font-size:18px;font-weight:700;margin-top:2px;}
+  .big{font-size:15px;font-weight:700;color:var(--accent);}
+  #weapon-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:2px;}
+  #ammo{font-size:34px;font-weight:900;color:#fff;line-height:1;}
+  #ammo small{font-size:15px;font-weight:600;color:#9fb4d8;}
+  #reload-hint{color:#ffd166;font-size:13px;font-weight:700;letter-spacing:1px;min-height:16px;}
+  #bottom-center{bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;font-size:13px;opacity:.9;white-space:nowrap;}
+  .key{display:inline-block;min-width:22px;padding:2px 7px;border:1px solid rgba(140,190,255,.4);border-radius:6px;background:rgba(255,255,255,.08);font-weight:700;color:#fff;}
+  #wave-banner{position:fixed;top:24%;left:50%;transform:translate(-50%,-50%);font-size:46px;font-weight:900;letter-spacing:6px;color:#fff;text-shadow:0 0 30px rgba(53,224,255,.9);opacity:0;transition:opacity .35s ease;z-index:6;pointer-events:none;}
+
+  /* crosshair */
+  #crosshair{position:fixed;top:50%;left:50%;width:34px;height:34px;transform:translate(-50%,-50%);z-index:6;pointer-events:none;}
+  #crosshair .dot{position:absolute;top:50%;left:50%;width:4px;height:4px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,255,255,.9);}
+  #crosshair .t{position:absolute;background:#fff;opacity:.9;}
+  #crosshair .t.up{left:50%;top:0;width:2px;height:8px;transform:translateX(-50%);}
+  #crosshair .t.down{left:50%;bottom:0;width:2px;height:8px;transform:translateX(-50%);}
+  #crosshair .t.left{top:50%;left:0;height:2px;width:8px;transform:translateY(-50%);}
+  #crosshair .t.right{top:50%;right:0;height:2px;width:8px;transform:translateY(-50%);}
+  #hitmark{position:fixed;top:50%;left:50%;width:36px;height:36px;transform:translate(-50%,-50%) rotate(45deg);z-index:6;pointer-events:none;opacity:0;}
+  #hitmark::before,#hitmark::after{content:"";position:absolute;background:#fff;box-shadow:0 0 8px rgba(255,255,255,.9);}
+  #hitmark::before{left:0;top:16px;width:36px;height:3px;}
+  #hitmark::after{top:0;left:16px;width:3px;height:36px;}
+  #hitmark.kill{box-shadow:0 0 14px rgba(255,80,80,.9);}
+  #hitmark.kill::before,#hitmark.kill::after{background:#ff4d5e;}
+
+  /* damage vignette */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(ellipse at center, transparent 45%, rgba(255,20,40,.55) 100%);opacity:0;transition:opacity .18s ease;}
+
+  /* overlays */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;background:radial-gradient(ellipse at center, rgba(15,22,38,.82), rgba(6,9,16,.94));backdrop-filter:blur(4px);transition:opacity .3s ease;}
+  .overlay.hidden{opacity:0;pointer-events:none;}
+  .card{max-width:640px;width:92%;padding:36px 40px;border:1px solid rgba(120,180,255,.22);border-radius:20px;background:rgba(12,18,32,.7);box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;}
+  .card h1{font-size:38px;letter-spacing:6px;margin-bottom:6px;background:linear-gradient(90deg,#35e0ff,#7fffd4,#ffd166);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .card .sub{color:#8fa7cc;margin-bottom:22px;font-size:14px;letter-spacing:2px;}
+  .controls{text-align:left;display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;font-size:14px;margin:18px 0 26px;}
+  .controls div{display:flex;justify-content:space-between;border-bottom:1px dashed rgba(120,180,255,.15);padding-bottom:6px;}
+  .controls .k{color:#35e0ff;font-weight:700;}
+  #start-btn{margin-top:4px;padding:14px 46px;font-size:20px;font-weight:800;letter-spacing:4px;color:#04121a;background:linear-gradient(90deg,#35e0ff,#7fffd4);border:none;border-radius:12px;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;}
+  #start-btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(53,224,255,.45);}
+  #final-score{font-size:54px;font-weight:900;color:#ffd166;margin:6px 0;}
+  .stats-line{color:#9fb4d8;font-size:15px;letter-spacing:1px;}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="top-left" class="panel">
+    <div class="label">生命值</div>
+    <div class="bar-wrap"><div id="hp-bar" class="bar"></div></div>
+    <div class="label" style="margin-top:8px;">体力（冲刺/翻滚）</div>
+    <div class="bar-wrap"><div id="st-bar" class="bar"></div></div>
+  </div>
+
+  <div id="top-right" class="panel">
+    <div class="label">得分</div>
+    <div id="score" class="value">0</div>
+    <div class="label" style="margin-top:6px;">波次 <span id="wave" class="big">1</span> · 击杀 <span id="kills" class="big">0</span></div>
+  </div>
+
+  <div id="bottom-center" class="panel">
+    <div id="weapon-name">突击步枪</div>
+    <div id="ammo">30 <small>/ 120</small></div>
+    <div id="reload-hint"></div>
+    <div class="label">
+      <span class="key">1</span><span class="key">2</span><span class="key">3</span> 切换武器
+      <span class="key">R</span> 换弹
+      <span class="key">Shift</span> 冲刺
+      <span class="key">空格</span> 翻滚
+      <span class="key">Q</span> 快速切换
+    </div>
+  </div>
+</div>
+
+<div id="crosshair"><div class="dot"></div><div class="t up"></div><div class="t down"></div><div class="t left"></div><div class="t right"></div></div>
+<div id="hitmark"></div>
+<div id="vignette"></div>
+<div id="wave-banner">第 1 波</div>
+
+<div id="start-overlay" class="overlay">
+  <div class="card">
+    <h1>火力前线</h1>
+    <div class="sub">FIREFRONT · 3D 射击生存</div>
+    <div class="controls">
+      <div><span>移动</span><span class="k">W A S D</span></div>
+      <div><span>瞄准 / 视角</span><span class="k">鼠标</span></div>
+      <div><span>射击</span><span class="k">鼠标左键</span></div>
+      <div><span>切换武器</span><span class="k">1 / 2 / 3 / Q</span></div>
+      <div><span>换弹</span><span class="k">R</span></div>
+      <div><span>冲刺</span><span class="k">Shift</span></div>
+      <div><span>翻滚闪避</span><span class="k">空格</span></div>
+      <div><span>暂停</span><span class="k">Esc</span></div>
+    </div>
+    <button id="start-btn">开 始 游 戏</button>
+  </div>
+</div>
+
+<div id="pause-overlay" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:30px;">已暂停</h1>
+    <div class="sub">点击下方按钮继续战斗</div>
+    <button id="resume-btn" class="card" style="padding:12px 40px;background:linear-gradient(90deg,#35e0ff,#7fffd4);border:none;border-radius:12px;font-size:18px;font-weight:800;color:#04121a;cursor:pointer;letter-spacing:3px;">继 续</button>
+  </div>
+</div>
+
+<div id="death-overlay" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:34px;background:linear-gradient(90deg,#ff4d5e,#ffd166);-webkit-background-clip:text;background-clip:text;color:transparent;">战 斗 结 束</h1>
+    <div id="final-score" class="value">0</div>
+    <div class="stats-line">坚持到第 <span id="final-wave">1</span> 波 · 击杀 <span id="final-kills">0</span> 个敌人</div>
+    <button id="restart-btn" style="margin-top:22px;padding:12px 40px;background:linear-gradient(90deg,#ff4d5e,#ffd166);border:none;border-radius:12px;font-size:18px;font-weight:800;color:#1a0a0a;cursor:pointer;letter-spacing:3px;">重新开始</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
