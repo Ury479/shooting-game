@@ -49,7 +49,9 @@
   scene.background = new THREE.Color(0x0d1420);
   scene.fog = new THREE.FogExp2(0x0d1420, 0.014);
 
-  const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 500);
+  const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 500);
+  camera.rotation.order = 'YXZ';
+  scene.add(camera);
 
   /* ---------- 灯光 ---------- */
   const hemi = new THREE.HemisphereLight(0x9fc4ff, 0x1a2430, 0.9);
@@ -261,7 +263,7 @@
     f.visible = true;
     f.userData.life = 0.06;
     f.material.opacity = 1;
-    f.scale.setScalar(0.6 + Math.random() * 0.5);
+    f.scale.setScalar(0.14 + Math.random() * 0.08);
     f.material.rotation = Math.random() * Math.PI * 2;
     muzzleLight.position.copy(pos);
     muzzleLight.intensity = 5;
@@ -345,7 +347,7 @@
   const player = {
     pos: new THREE.Vector3(0, 0, 0),
     yaw: 0,
-    pitch: 0.24,
+    pitch: 0,
     vel: new THREE.Vector3(),
     hp: 100,
     stamina: 100,
@@ -366,6 +368,7 @@
   // 根节点（含移动/摆头）
   const playerRoot = new THREE.Group();
   playerRoot.position.copy(player.pos);
+  playerRoot.visible = false;   // 第一人称：隐藏第三人称身体
   scene.add(playerRoot);
 
   // 身体节点（随 yaw 旋转）
@@ -411,7 +414,7 @@
   const weaponHolder = new THREE.Group();
   weaponHolder.position.set(WEAPON_BASE.x, WEAPON_BASE.y, WEAPON_BASE.z);
   bodyNode.add(weaponHolder);
-  let recoilPitch = 0, recoilZ = 0;
+  let recoilPitch = 0, recoilZ = 0, recoilCam = 0;
 
   // 生成三把武器并放入挂点
   const gunGroups = {};
@@ -423,6 +426,20 @@
     gunGroups[type] = g;
   });
 
+  // 第一人称武器（viewmodel，挂在相机上）
+  const FPS_BASE = { x: 0.34, y: -0.30, z: -0.55 };
+  const fpsRig = new THREE.Group();
+  fpsRig.position.set(FPS_BASE.x, FPS_BASE.y, FPS_BASE.z);
+  fpsRig.rotation.y = Math.PI;   // 枪模 +Z 朝向相机前向 -Z
+  camera.add(fpsRig);
+  const fpsGuns = {};
+  WEAPON_ORDER.forEach(function (type) {
+    const g = buildGun(type);
+    g.visible = false;
+    fpsRig.add(g);
+    fpsGuns[type] = g;
+  });
+
   let currentWeapon = 'rifle';
   let reloading = false;
   let reloadTimer = 0;
@@ -431,16 +448,16 @@
   const reserve = { pistol: 60, rifle: 150, shotgun: 36 };
   let lastShotAt = -10;
 
-  function currentGun() { return gunGroups[currentWeapon]; }
+  function currentGun() { return fpsGuns[currentWeapon]; }
   function currentCfg() { return WEAPONS[currentWeapon]; }
 
   function switchWeapon(type) {
     if (type === currentWeapon || switchTimer > 0) return;
-    WEAPON_ORDER.forEach(function (t) { gunGroups[t].visible = false; });
+    WEAPON_ORDER.forEach(function (t) { fpsGuns[t].visible = false; });
     currentWeapon = type;
     reloading = false;
     reloadTimer = 0;
-    gunGroups[type].visible = true;
+    fpsGuns[type].visible = true;
     switchTimer = 0.22;
     updateHudAmmo();
     playSound('switch');
@@ -694,6 +711,7 @@
     // 后坐力
     recoilZ += cfg.recoil * 0.4;
     recoilPitch += cfg.recoil * 0.7;
+    recoilCam += cfg.kick * 0.10;
     shake += cfg.kick * 0.5;
 
     // 抛壳
@@ -799,7 +817,7 @@
   function startGame() {
     score = 0; kills = 0;
     player.hp = 100; player.stamina = 100; player.alive = true;
-    player.pos.set(0, 0, 0); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0.24;
+    player.pos.set(0, 0, 0); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
     enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); });
     enemies.length = 0;
     ammo.pistol = 12; ammo.rifle = 30; ammo.shotgun = 6;
@@ -827,9 +845,9 @@
 
   /* ---------- 输入（键盘 + 鼠标/触摸，兼容指针锁定失败） ---------- */
   function setLook(dx, dy) {
-    player.yaw += dx * 0.0024;
+    player.yaw -= dx * 0.0024;
     player.pitch -= dy * 0.0024;
-    player.pitch = Math.max(-0.5, Math.min(1.15, player.pitch));
+    player.pitch = Math.max(-1.4, Math.min(1.4, player.pitch));
   }
 
   window.addEventListener('keydown', function (e) {
@@ -989,7 +1007,7 @@
     dodgeT = 0.38;
     dodgeCd = 0.9;
     const dir = moveDir.clone();
-    if (dir.lengthSq() < 0.001) dir.set(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+    if (dir.lengthSq() < 0.001) dir.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     dir.normalize();
     player.vel.addScaledVector(dir, 14);
     dustPuff(player.pos.clone().add(new THREE.Vector3(0, 0.2, 0)), 10, true);
@@ -1073,6 +1091,7 @@
     const dt = Math.min(clock.getDelta(), 0.05);
     if (running && player.alive) timeNow += dt;
 
+    updateCamera(dt);
     if (running && player.alive) {
       updatePlayer(dt);
       updateEnemies(dt);
@@ -1081,7 +1100,6 @@
     updateParticles(dt);
     updateTracers(dt);
     updateFlashes(dt);
-    updateCamera(dt);
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
     if (vop > 0) vignetteEl.style.opacity = Math.max(0, vop - dt * 2.2).toFixed(3);
@@ -1105,7 +1123,7 @@
     f = Math.max(-1, Math.min(1, f));
     s = Math.max(-1, Math.min(1, s));
 
-    fwd.set(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+    fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     right.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
     moveDir.set(0, 0, 0).addScaledVector(fwd, f).addScaledVector(right, s);
     if (moveDir.lengthSq() > 0) moveDir.normalize();
@@ -1159,11 +1177,14 @@
     // 面向移动/射击方向
     bodyNode.rotation.y = player.yaw;
 
-    // 武器瞄准俯仰 + 后坐力回弹
+    // 第一人称武器：后坐回弹 + 走路摆动
     recoilPitch += (0 - recoilPitch) * Math.min(1, 12 * dt);
     recoilZ += (0 - recoilZ) * Math.min(1, 12 * dt);
-    weaponHolder.rotation.x = player.pitch + recoilPitch;
-    weaponHolder.position.z = WEAPON_BASE.z - recoilZ;
+    recoilCam += (0 - recoilCam) * Math.min(1, 14 * dt);
+    fpsRig.rotation.x = recoilPitch + Math.sin(bobT) * 0.03 * swing;
+    fpsRig.position.z = FPS_BASE.z + recoilZ;
+    fpsRig.position.x = FPS_BASE.x + Math.cos(bobT * 0.5) * 0.03 * swing;
+    fpsRig.position.y = FPS_BASE.y + Math.sin(bobT) * 0.03 * swing;
 
     // 换弹 / 切枪计时
     if (reloading) {
@@ -1292,41 +1313,32 @@
     }
   }
 
-  /* ---------- 相机 ---------- */
-  const pivot = new THREE.Vector3();
-  const camOffset = new THREE.Vector3();
-  const aimTarget = new THREE.Vector3();
+  /* ---------- 相机（第一人称） ---------- */
+  const EYE_HEIGHT = 1.62;
 
   function updateCamera(dt) {
-    pivot.set(player.pos.x, player.pos.y + 1.55, player.pos.z);
-
-    const cy = Math.cos(player.yaw + Math.PI), sy = Math.sin(player.yaw + Math.PI);
-    const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
-    camOffset.set(sy * cp, sp, cy * cp);
-
-    camera.position.copy(pivot).addScaledVector(camOffset, CAM_DIST);
+    camera.position.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = player.yaw;
+    camera.rotation.x = player.pitch + recoilCam;
+    camera.rotation.z = 0;
 
     // 屏幕震动
     if (shake > 0.001) {
       shake = Math.max(0, shake - dt * 6);
-      const amp = shake * 0.16;
+      const amp = shake * 0.12;
       camera.position.x += (Math.random() - 0.5) * amp;
       camera.position.y += (Math.random() - 0.5) * amp;
       camera.position.z += (Math.random() - 0.5) * amp;
     }
 
-    aimTarget.set(
-      pivot.x + Math.sin(player.yaw) * cp * 30,
-      pivot.y + sp * 30,
-      pivot.z + Math.cos(player.yaw) * cp * 30
-    );
-    camera.lookAt(aimTarget);
+    camera.updateMatrixWorld(true);
   }
 
   /* ---------- 启动渲染循环 ---------- */
-  // 初始显示步枪
-  WEAPON_ORDER.forEach(function (t) { gunGroups[t].visible = false; });
-  gunGroups.rifle.visible = true;
+  // 初始显示步枪（第一人称）
+  WEAPON_ORDER.forEach(function (t) { fpsGuns[t].visible = false; });
+  fpsGuns.rifle.visible = true;
   updateHudAmmo();
   updateHud();
   animate();
