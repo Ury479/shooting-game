@@ -304,6 +304,12 @@
     melee:  { name:'军刀', key:7, auto:false, damage:100, interval:0.5, spread:0, pellets:0, mag:1, reserve:1, reload:0, recoil:0, kick:0, color:0xcccccc, price:0, melee:true, range:3 }
   };
   const WEAPON_ORDER = ['pistol','smg','rifle','shotgun','sniper','lmg','melee'];
+  const TEMP_WEAPONS = {
+    gatling: { name:'加特林', auto:true, damage:12, interval:0.05, spread:0.04, pellets:1, mag:Infinity, reserve:Infinity, reload:0, recoil:0.1, kick:0.5, color:0x9a9a9a, range:70, heat:true, heatMax:100, cool:3, reloadMin:3, reloadMax:5, temp:true },
+    flame:   { name:'火焰喷射器', auto:true, damage:5, interval:0.05, spread:0.16, pellets:1, mag:Infinity, reserve:Infinity, reload:0, recoil:0.04, kick:0.15, color:0xff7b00, range:12, flame:true, burn:2.2, temp:true },
+    laser:   { name:'激光炮', auto:true, damage:45, interval:0.28, spread:0.001, pellets:1, mag:Infinity, reserve:Infinity, reload:0, recoil:0.5, kick:1.2, color:0x35e0ff, range:120, laser:true, temp:true },
+    saber:   { name:'光剑', auto:false, damage:150, interval:0.4, spread:0, pellets:0, mag:Infinity, reserve:Infinity, reload:0, recoil:0, kick:0, color:0x00ffcc, range:3.2, melee:true, temp:true }
+  };
 
   /* ---------- 武器模型 ---------- */
   function box(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); }
@@ -313,7 +319,7 @@
     return c;
   }
   function buildGun(type) {
-    const cfg = WEAPONS[type];
+    const cfg = WEAPONS[type] || TEMP_WEAPONS[type] || { color: 0x888888 };
     const accent = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.4, metalness: 0.6 });
     const g = new THREE.Group();
     const muzzle = new THREE.Object3D();
@@ -375,6 +381,28 @@
       const handle = box(0.05, 0.05, 0.16, MAT.dark); handle.position.set(0, -0.01, -0.12); g.add(handle);
       muzzle.position.set(0, 0.03, 0.44);
       eject.position.set(0, 0.03, 0.05);
+    } else if (type === 'gatling') {
+      g.add(box(0.14, 0.2, 0.5, MAT.dark));
+      const hub = cyl(0.06, 0.4, MAT.metal); hub.position.set(0, 0, 0.45); g.add(hub);
+      for (let bi = 0; bi < 6; bi++) { const bar = cyl(0.03, 0.62, MAT.metal); bar.position.set(0, 0, 0.6); g.add(bar); }
+      muzzle.position.set(0, 0, 0.94);
+      eject.position.set(0.08, 0.1, 0.0);
+    } else if (type === 'flame') {
+      g.add(box(0.12, 0.14, 0.5, MAT.dark));
+      const tank = cyl(0.08, 0.3, MAT.metal); tank.position.set(0, 0.02, -0.15); g.add(tank);
+      muzzle.position.set(0, 0.02, 0.5);
+      eject.position.set(0.05, 0.08, 0.1);
+    } else if (type === 'laser') {
+      g.add(box(0.1, 0.12, 0.6, MAT.dark));
+      const rod = cyl(0.045, 0.7, MAT.metal); rod.position.set(0, 0.02, 0.6); g.add(rod);
+      const cell = box(0.12, 0.12, 0.12, MAT.visor); cell.position.set(0, 0.02, 0.1); g.add(cell);
+      muzzle.position.set(0, 0.02, 0.95);
+      eject.position.set(0.05, 0.08, 0.0);
+    } else if (type === 'saber') {
+      const blade = box(0.05, 0.05, 0.8, new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x004433, emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.2 })); blade.position.set(0, 0.02, 0.4); g.add(blade);
+      const hilt = cyl(0.06, 0.2, MAT.dark); hilt.position.set(0, 0, -0.05); g.add(hilt);
+      muzzle.position.set(0, 0.02, 0.8);
+      eject.position.set(0, 0, 0.0);
     }
     muzzle.name = 'muzzle';
     eject.name = 'eject';
@@ -409,7 +437,8 @@
     tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, scout:false, engineer:false, skill:'shield', shieldRegen:16 },
     scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'speed', shieldRegen:10 },
     medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, scout:false, engineer:false, skill:'heal', shieldRegen:20 },
-    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret', shieldRegen:10 }
+    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret', shieldRegen:10 },
+    ninja: { name:'忍者', hp:100, speed:6.2, stamina:110, color:0x2b3a4a, dark:0x1a2633, healMult:1, dmgMult:1.5, resMult:1, scout:false, engineer:false, skill:'clone', shieldRegen:10 }
   };
   let hero = 'assault';
   let mode = 'endless';
@@ -423,6 +452,11 @@
   let saveUnlocked = 0;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
   const upgrades = { pistol:0, smg:0, rifle:0, shotgun:0, sniper:0, lmg:0, melee:0 };
+  const heroLevels = { assault:0, tank:0, scout:0, medic:0, engineer:0, ninja:0 };
+  let tempWeapon = null, tempT = 0, tempHeat = 0;
+  let overheat = false, coolT = 0, reloadT = 0;
+  let mines = 0;
+  const clones = [];
 
   // ---- 进度持久化 ----------------
   const SAVE_KEY = 'shooting_save_v1';
@@ -434,12 +468,13 @@
         if (typeof d.medkits === 'number') medkits = d.medkits;
         WEAPON_ORDER.forEach(function (t) { if (t in d.owned) owned[t] = !!d.owned[t]; });
         WEAPON_ORDER.forEach(function (t) { upgrades[t] = (d.upgrades && d.upgrades[t]) || 0; });
+        if (d.heroLevels) Object.keys(heroLevels).forEach(function (k) { heroLevels[k] = (d.heroLevels[k] || 0); });
         if (typeof d.unlocked === 'number') saveUnlocked = Math.min(d.unlocked, 99);
       }
     } catch (e) {}
   }
   function saveGame() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ coins: coins, medkits: medkits, owned: owned, upgrades: upgrades, unlocked: saveUnlocked })); } catch (e) {}
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ coins: coins, medkits: medkits, owned: owned, upgrades: upgrades, heroLevels: heroLevels, unlocked: saveUnlocked })); } catch (e) {}
   }
   function upgradeCost(type) {
     const lv = upgrades[type] || 0;
@@ -483,9 +518,16 @@
       reload: cfg.reload * Math.pow(0.97, lv)
     };
   }
-  function heroStats() { return HEROES[hero]; }
+  function heroStats() {
+    const h = HEROES[hero];
+    const lv = heroLevels[hero] || 0;
+    const s = { name:h.name, hp:h.hp, speed:(h.speed + 0.2*lv), stamina:h.stamina, color:h.color, dark:h.dark, healMult:h.healMult, dmgMult:h.dmgMult, resMult:h.resMult, scout:h.scout, engineer:h.engineer, skill:h.skill, shieldRegen:(h.shieldRegen + 4*lv), maxTurrets:Math.min(6, 2 + lv) };
+    if (h.skill === 'damage') s.dmgMult = Math.min(4.2, h.dmgMult + 0.4 * lv);
+    else if (h.skill === 'shield') s.resMult = Math.max(0.35, h.resMult - 0.05 * lv);
+    return s;
+  }
   function heroPerk(h) {
-    const skName = { damage:'伤害提升', shield:'附加护盾', speed:'移速提升', heal:'恢复生命', turret:'建造炮台' }[h.skill] || '';
+    const skName = { damage:'伤害提升', shield:'附加护盾', speed:'移速提升', heal:'恢复生命', turret:'建造炮台', clone:'召唤影分身' }[h.skill] || '';
     let extra = '';
     if (h.dmgMult > 1) extra = ' · 被动伤害×' + h.dmgMult;
     else if (h.resMult < 1) extra = ' · 被动受伤×' + h.resMult;
@@ -593,6 +635,12 @@
     fpsRig.add(g);
     fpsGuns[type] = g;
   });
+  const tempGuns = {};
+  const tempGunsTPS = {};
+  Object.keys(TEMP_WEAPONS).forEach(function (type) {
+    const gf = buildGun(type); gf.visible = false; fpsRig.add(gf); tempGuns[type] = gf;
+    const gt = buildGun(type); gt.visible = false; weaponHolder.add(gt); tempGunsTPS[type] = gt;
+  });
 
   let currentWeapon = 'pistol';
   let reloading = false;
@@ -607,8 +655,12 @@
     playerRoot.visible = (viewMode === 'tps');
     fpsRig.visible = (viewMode === 'fps');
     WEAPON_ORDER.forEach(function (t) {
-      gunGroups[t].visible = (viewMode === 'tps' && t === currentWeapon);
-      fpsGuns[t].visible = (viewMode === 'fps' && t === currentWeapon);
+      gunGroups[t].visible = (!tempWeapon && viewMode === 'tps' && t === currentWeapon);
+      fpsGuns[t].visible = (!tempWeapon && viewMode === 'fps' && t === currentWeapon);
+    });
+    Object.keys(TEMP_WEAPONS).forEach(function (t) {
+      if (tempGunsTPS[t]) tempGunsTPS[t].visible = (tempWeapon === t && viewMode === 'tps');
+      if (tempGuns[t]) tempGuns[t].visible = (tempWeapon === t && viewMode === 'fps');
     });
   }
   function setViewMode(m) {
@@ -621,10 +673,14 @@
     if (t) t.classList.toggle('active', viewMode === 'tps');
   }
 
-  function currentGun() { return (viewMode === 'tps') ? gunGroups[currentWeapon] : fpsGuns[currentWeapon]; }
-  function currentCfg() { return WEAPONS[currentWeapon]; }
+  function currentGun() {
+    if (tempWeapon) return (viewMode === 'tps') ? tempGunsTPS[tempWeapon] : tempGuns[tempWeapon];
+    return (viewMode === 'tps') ? gunGroups[currentWeapon] : fpsGuns[currentWeapon];
+  }
+  function currentCfg() { return tempWeapon ? TEMP_WEAPONS[tempWeapon] : WEAPONS[currentWeapon]; }
 
   function switchWeapon(type) {
+    if (tempWeapon) return;
     if (!owned[type]) { showBanner('未拥有，请在商店购买'); return; }
     if (type === currentWeapon || switchTimer > 0) return;
     currentWeapon = type;
@@ -718,7 +774,7 @@
       exploded: false,
       alive: true,
       legPivots, armPivots, hbBack, hbFront,
-      ring: ring, charging: false, chargeT: 0, attackT: 3,
+      ring: ring, charging: false, chargeT: 0, attackT: 3, burnT: 0, burnTick: 0,
       dieScale: s
     };
   }
@@ -820,6 +876,7 @@
     if (!gameStarted || !player.alive || !running) return;
     const h = heroStats();
     if (h.skill === 'turret') { buildTurret(); return; }
+    if (h.skill === 'clone') { summonClones(); skillCd = 20; showBanner('召唤影分身！'); playSound('skill'); return; }
     if (skillCd > 0) { showBanner('技能冷却中'); return; }
     if (h.skill === 'damage') { dmgBuff = 1.5; buffT = 6; skillCd = 20; showBanner('伤害提升！(6s)'); playSound('skill'); }
     else if (h.skill === 'shield') { player.shield = Math.min(player.maxShield * 1.5, player.shield + 60); skillCd = 20; showBanner('+60 护盾'); playSound('skill'); }
@@ -830,7 +887,7 @@
     if (hero !== 'engineer') { showBanner('该英雄无炮台技能'); return; }
     if (!gameStarted || !player.alive || !running) return;
     if (turretCooldown > 0) { showBanner('炮台冷却中…'); return; }
-    if (turrets.length >= MAX_TURRETS) { showBanner('炮台数量已达上限'); return; }
+    if (turrets.length >= (heroStats().maxTurrets || MAX_TURRETS)) { showBanner('炮台数量已达上限'); return; }
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
     const px = player.pos.x + fx * 3, pz = player.pos.z + fz * 3;
     const grp = new THREE.Group();
@@ -1062,6 +1119,179 @@
     if (hitAny) { hitmark(0); playSound('meleeHit'); } else { playSound('melee'); }
   }
 
+  /* ---------- 地图装备 / 临时武器 / 地雷 / 影分身 ---------- */
+  const equips = [];
+  const minesArray = [];
+  function spawnEquip(type, pos) {
+    const colors = { gatling:0x9a9a9a, flame:0xff7b00, laser:0x35e0ff, saber:0x00ffcc, mine:0x888888 };
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: colors[type] || 0x888888, roughness: 0.4, metalness: 0.4, emissive: colors[type] || 0x333333, emissiveIntensity: 0.4 }));
+    mesh.position.set(pos.x, 0.5, pos.z);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    equips.push({ mesh: mesh, type: type, t: Math.random() * 6 });
+  }
+  function initEquipment() {
+    const types = ['gatling', 'flame', 'laser', 'saber', 'mine'];
+    for (let i = 0; i < 5; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 12 + Math.random() * 18;
+      spawnEquip(types[i % types.length], { x: player.pos.x + Math.cos(ang) * dist, z: player.pos.z + Math.sin(ang) * dist });
+    }
+  }
+  function updateEquips(dt) {
+    for (let i = equips.length - 1; i >= 0; i--) {
+      const eq = equips[i];
+      eq.t += dt;
+      eq.mesh.position.y = 0.5 + Math.sin(eq.t * 3) * 0.12;
+      eq.mesh.rotation.y += dt * 2;
+      const dx = player.pos.x - eq.mesh.position.x, dz = player.pos.z - eq.mesh.position.z;
+      if (dx * dx + dz * dz < 2.5) { collectEquip(eq.type); scene.remove(eq.mesh); equips.splice(i, 1); }
+    }
+  }
+  function collectEquip(type) {
+    if (type === 'mine') { mines += 2; showBanner('+2 地雷（X 放置）'); playSound('pickup'); }
+    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : 35); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; showBanner('装备：' + TEMP_WEAPONS[type].name); playSound('pickup'); applyView(); updateHudAmmo(); }
+  }
+  function placeMine() {
+    if (!gameStarted || !player.alive || !running) return;
+    if (mines <= 0) { showBanner('没有地雷'); return; }
+    mines--;
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xff5e5e, roughness: 0.4, emissive: 0x330000, emissiveIntensity: 0.6 }));
+    mesh.position.set(player.pos.x, 0.06, player.pos.z);
+    scene.add(mesh);
+    minesArray.push({ mesh: mesh, x: player.pos.x, z: player.pos.z });
+    playSound('buy');
+  }
+  function updateMines() {
+    for (let i = minesArray.length - 1; i >= 0; i--) {
+      const m = minesArray[i];
+      let boom = false;
+      enemies.forEach(function (e) { if (!boom && e.alive && !e.dying && Math.hypot(e.group.position.x - m.x, e.group.position.z - m.z) < 1.6) boom = true; });
+      if (boom) {
+        enemies.forEach(function (e) { if (!e.alive || e.dying) return; if (Math.hypot(e.group.position.x - m.x, e.group.position.z - m.z) < 6) e.takeDamage(Math.round(80 * (1 + (worldWave() - 1) * 0.2)), null); });
+        burstSparks(new THREE.Vector3(m.x, 0.5, m.z), 0xff7b00, 16);
+        shake += 0.5; playSound('explode');
+        scene.remove(m.mesh); minesArray.splice(i, 1);
+      }
+    }
+  }
+  function summonClones() {
+    clones.forEach(function (c) { scene.remove(c.group); });
+    clones.length = 0;
+    for (let i = 0; i < 2; i++) {
+      const g = new THREE.Group();
+      const body = box(0.4, 0.9, 0.3, new THREE.MeshStandardMaterial({ color: 0x16202e, roughness: 0.5, metalness: 0.2 })); body.position.y = 0.9; g.add(body);
+      const head = box(0.24, 0.22, 0.24, MAT.body); head.position.y = 1.6; g.add(head);
+      const band = box(0.26, 0.06, 0.26, new THREE.MeshStandardMaterial({ color: 0x35e0ff, emissive: 0x224466, emissiveIntensity: 0.8 })); band.position.y = 1.66; g.add(band);
+      g.position.set(player.pos.x + (i ? 2 : -2), 0, player.pos.z);
+      scene.add(g);
+      clones.push({ group: g, fireCd: 0.2 + i * 0.3, life: 20 });
+    }
+  }
+  function updateClones(dt) {
+    for (let i = clones.length - 1; i >= 0; i--) {
+      const c = clones[i];
+      c.life -= dt;
+      if (c.life <= 0) { scene.remove(c.group); clones.splice(i, 1); continue; }
+      const ang = timeNow * 1.4 + i * 2;
+      c.group.position.set(player.pos.x + Math.cos(ang) * 2.2, Math.sin(timeNow * 4) * 0.05, player.pos.z + Math.sin(ang) * 2.2);
+      c.fireCd -= dt;
+      if (c.fireCd <= 0) {
+        let near = null, nd = 9;
+        enemies.forEach(function (e) { if (!e.alive || e.dying) return; const d = Math.hypot(e.group.position.x - c.group.position.x, e.group.position.z - c.group.position.z); if (d < nd) { nd = d; near = e; } });
+        if (near) {
+          c.fireCd = 0.9;
+          const f = c.group.position.clone(); f.y = 1.2;
+          const t = near.group.position.clone().add(new THREE.Vector3(0, 1, 0));
+          spawnTracer(f, t);
+          near.takeDamage(Math.round(14 * (1 + (worldWave() - 1) * 0.18)), null);
+          burstSparks(t, 0x35e0ff, 2);
+        }
+      }
+    }
+  }
+  function fireOneBullet(cfg) {
+    const range = cfg.range || 200;
+    const targets = rayTargets();
+    ray.far = range;
+    ray.setFromCamera({ x: 0, y: 0 }, camera);
+    const aimHits = ray.intersectObjects(targets, false);
+    const camDir = camera.getWorldDirection(new THREE.Vector3());
+    const aimPoint = aimHits.length ? aimHits[0].point.clone() : camera.position.clone().addScaledVector(camDir, range);
+    const muzzle = muzzleWorldPos();
+    const dir = aimPoint.clone().sub(muzzle).normalize();
+    dir.x += (Math.random() - 0.5) * cfg.spread * 2; dir.y += (Math.random() - 0.5) * cfg.spread * 2; dir.z += (Math.random() - 0.5) * cfg.spread * 2; dir.normalize();
+    ray.set(muzzle, dir);
+    const hits = ray.intersectObjects(targets, false);
+    let end = muzzle.clone().addScaledVector(dir, range), hitEnemy = null;
+    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.isGround || o.userData.isObstacle) { end = hits[i].point; break; } if (o.userData.enemy) { end = hits[i].point; hitEnemy = findEnemyByMesh(o); break; } }
+    spawnTracer(muzzle, end);
+    if (hitEnemy) { hitEnemy.takeDamage(cfg.damage * heroStats().dmgMult * dmgBuff, dir); hitmark(0); burstSparks(end, 0xffc46b, 3); }
+    else burstSparks(end, 0x9fb4d8, 2);
+    spawnFlash(muzzle);
+    recoilZ += cfg.recoil * 0.4; recoilPitch += cfg.recoil * 0.7; shake += cfg.kick * 0.3;
+    playSound('shot');
+  }
+  function fireFlame(cfg) {
+    const range = cfg.range || 12;
+    const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    burstSparks(muzzleWorldPos(), 0xff7b00, 3);
+    let hitAny = false;
+    enemies.forEach(function (e) {
+      if (!e.alive || e.dying) return;
+      const dx = e.group.position.x - player.pos.x, dz = e.group.position.z - player.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < range + e.cfg.scale) {
+        const toE = new THREE.Vector3(dx, 0, dz).normalize();
+        if (fwd.angleTo(toE) < 0.5) { e.takeDamage(cfg.damage, toE); e.burnT = (e.burnT || 0) + cfg.burn; hitAny = true; }
+      }
+    });
+    if (hitAny) { hitmark(0); playSound('meleeHit'); } else playSound('shot');
+  }
+  function fireLaser(cfg) {
+    const range = cfg.range || 120;
+    const targets = rayTargets();
+    ray.far = range;
+    ray.setFromCamera({ x: 0, y: 0 }, camera);
+    const hits = ray.intersectObjects(targets, false);
+    const camDir = camera.getWorldDirection(new THREE.Vector3());
+    const endP = hits.length ? hits[hits.length - 1].point.clone() : camera.position.clone().addScaledVector(camDir, range);
+    spawnTracer(muzzleWorldPos(), endP);
+    let hitAny = false;
+    hits.forEach(function (hs) { const o = hs.object; if (o.userData.enemy) { const en = findEnemyByMesh(o); if (en) { en.takeDamage(cfg.damage, null); hitAny = true; } } });
+    if (hitAny) hitmark(0);
+    playSound('shot');
+  }
+  function fireSaber(cfg) {
+    meleeSwing = 1;
+    const range = cfg.range || 3.5;
+    const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    let hitAny = false;
+    enemies.forEach(function (e) {
+      if (!e.alive || e.dying) return;
+      const dx = e.group.position.x - player.pos.x, dz = e.group.position.z - player.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < range + e.cfg.scale) {
+        const toE = new THREE.Vector3(dx, 0, dz).normalize();
+        if (fwd.angleTo(toE) < 1.0) { e.takeDamage(cfg.damage * heroStats().dmgMult * dmgBuff, toE); burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0x00ffcc, 6); hitAny = true; }
+      }
+    });
+    if (hitAny) { hitmark(0); playSound('meleeHit'); } else playSound('melee');
+  }
+  function tryTempFire(cfg) {
+    if (!player.alive || switchTimer > 0) return;
+    if (timeNow - lastShotAt < cfg.interval) return;
+    if (tempWeapon === 'gatling') {
+      if (overheat || reloadT > 0) return;
+      lastShotAt = timeNow;
+      fireOneBullet(cfg);
+      tempHeat += 4;
+      if (tempHeat >= (cfg.heatMax || 100)) { overheat = true; coolT = cfg.cool || 3; }
+    } else if (tempWeapon === 'flame') { lastShotAt = timeNow; fireFlame(cfg); }
+    else if (tempWeapon === 'laser') { lastShotAt = timeNow; fireLaser(cfg); }
+    else if (tempWeapon === 'saber') { lastShotAt = timeNow; fireSaber(cfg); }
+  }
+
   /* ---------- 敌人子弹 / 自爆 ---------- */
   const enemyBullets = [];
   function fireEnemyBullet(from, to, dmg, color) {
@@ -1107,6 +1337,7 @@
 
   function tryFire() {
     const cfg = currentCfg();
+    if (tempWeapon) { tryTempFire(cfg); return; }
     const ws = wStats(currentWeapon);
     if (!player.alive || reloading || switchTimer > 0) return;
     if (timeNow - lastShotAt < ws.interval) return;
@@ -1273,6 +1504,12 @@
 
   /* ---------- 计分 HUD ---------- */
   function updateHudAmmo() {
+    if (tempWeapon) {
+      const tp = TEMP_WEAPONS[tempWeapon];
+      weaponNameEl.textContent = tp.name;
+      ammoEl.innerHTML = '∞ <small>' + (tp.heat ? '热量' : tp.flame ? '燃烧' : '装备') + '</small>';
+      return;
+    }
     const cfg = currentCfg();
     weaponNameEl.textContent = cfg.name;
     if (cfg.melee) {
@@ -1313,11 +1550,16 @@
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
     lastHurtTime = -99; turretCooldown = 0; skillCd = 0; buffT = 0; dmgBuff = 1; spdBuff = 1;
+    tempWeapon = null; tempT = 0; tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; mines = 0;
+    equips.forEach(function (e) { scene.remove(e.mesh); }); equips.length = 0;
+    minesArray.forEach(function (m) { scene.remove(m.mesh); }); minesArray.length = 0;
+    clones.forEach(function (c) { scene.remove(c.group); }); clones.length = 0;
     turrets.forEach(function (t) { scene.remove(t.group); });
     turrets.length = 0;
     currentWeapon = 'pistol';
     applyView();
     startWave(1);
+    initEquipment();
     updateHudAmmo();
     updateHud();
     updateShopUI(); updateMenuUI();
@@ -1395,6 +1637,13 @@
     const list = document.getElementById('upgrade-list');
     if (!list) return;
     list.innerHTML = '';
+    const hrow = document.createElement('div');
+    hrow.className = 'upg-row';
+    hrow.id = 'upg-hero';
+    hrow.innerHTML = '<span>英雄等级</span><span class="upg-level">Lv.0</span><span class="upg-cost">升级 400 金币</span><button class="upg-btn shop-btn">升级</button>';
+    const hbtn = hrow.querySelector('.upg-btn');
+    if (hbtn) hbtn.addEventListener('click', upgradeHero);
+    list.appendChild(hrow);
     WEAPON_ORDER.forEach(function (t) {
       const row = document.createElement('div');
       row.className = 'upg-row';
@@ -1407,6 +1656,14 @@
   }
   function updateUpgradeUI() {
     const c = document.getElementById('upgrade-coins'); if (c) c.textContent = coins;
+    const hrow = document.getElementById('upg-hero');
+    if (hrow) {
+      const lv = heroLevels[hero] || 0;
+      const cost = 400 + lv * 600;
+      const l = hrow.querySelector('.upg-level'); if (l) l.textContent = 'Lv.' + lv;
+      const cc = hrow.querySelector('.upg-cost'); if (cc) cc.textContent = '升级 ' + cost + ' 金币';
+      const b = hrow.querySelector('.upg-btn'); if (b) b.disabled = coins < cost;
+    }
     WEAPON_ORDER.forEach(function (t) {
       const row = document.getElementById('upg-' + t);
       if (!row) return;
@@ -1415,6 +1672,16 @@
       const btn = row.querySelector('.upg-btn');
       if (btn) { btn.disabled = !owned[t] || coins < upgradeCost(t); btn.textContent = owned[t] ? '升级' : '未拥有'; }
     });
+  }
+  function upgradeHero() {
+    const lv = heroLevels[hero] || 0;
+    const cost = 400 + lv * 600;
+    if (coins < cost) { playSound('noMoney'); showBanner('金币不足'); return; }
+    coins -= cost;
+    heroLevels[hero] = lv + 1;
+    saveGame();
+    playSound('buy');
+    updateUpgradeUI(); updateMenuUI(); updateHudAmmo();
   }
   function upgradeWeapon(type) {
     if (!owned[type]) return;
@@ -1451,6 +1718,7 @@
     if (e.code === 'KeyC') tryDodge();
     if (e.code === 'KeyG') { e.preventDefault(); useHeroSkill(); }
     if (e.code === 'KeyV') { e.preventDefault(); useHeroSkill(); }
+    if (e.code === 'KeyX') { e.preventDefault(); placeMine(); }
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
   window.addEventListener('keyup', function (e) {
@@ -1590,6 +1858,7 @@
   bindBtn('btn-jump', function () { jump(); });
   bindBtn('btn-turret', function () { buildTurret(); });
   bindBtn('btn-skill', function () { useHeroSkill(); });
+  bindBtn('btn-mine', function () { placeMine(); });
   const sprintBtn = document.getElementById('btn-sprint');
   if (sprintBtn) {
     sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
@@ -1804,6 +2073,9 @@
       updateEnemyBullets(dt);
       updateTurrets(dt);
       updateRadar();
+      updateEquips(dt);
+      updateMines();
+      updateClones(dt);
     }
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
@@ -1827,6 +2099,14 @@
     if (buffT <= 0) { dmgBuff = 1; spdBuff = 1; }
     if (skillCd > 0) skillCd -= dt;
     if (turretCooldown > 0) turretCooldown -= dt;
+    if (tempWeapon) {
+      tempT -= dt;
+      if (tempT <= 0) { tempWeapon = null; applyView(); updateHudAmmo(); }
+      if (tempWeapon === 'gatling') {
+        if (overheat) { coolT -= dt; if (coolT <= 0) { reloadT = 3 + Math.random() * 2; overheat = false; } }
+        else if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) tempHeat = 0; }
+      }
+    }
 
     // 输入方向（键盘 + 触摸摇杆）
     let f = touch.f, s = touch.s;
@@ -1958,6 +2238,10 @@
       e.hitCooldown -= dt;
       e.attackCooldown -= dt;
       e.walkPhase += dt * (4 + e.cfg.speed * e.spdScale * 1.4);
+      if (e.burnT > 0) {
+        e.burnT -= dt; e.burnTick -= dt;
+        if (e.burnTick <= 0) { e.burnTick = 0.5; e.takeDamage(6); burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0xff7b00, 2); }
+      }
 
       // 朝向玩家并移动（按类型）
       const toP = new THREE.Vector3(player.pos.x - e.group.position.x, 0, player.pos.z - e.group.position.z);
