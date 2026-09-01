@@ -403,11 +403,11 @@
 
   /* ---------- 英雄 / 货币 / 装备 ---------- */
   const HEROES = {
-    assault:  { name:'突击手', hp:100, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1, regen:0, scout:false, engineer:false },
-    tank:     { name:'重装兵', hp:150, speed:4.2, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1.35, regen:0, scout:false, engineer:false },
-    scout:    { name:'侦察兵', hp:90, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, regen:0, scout:true, engineer:false },
-    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, regen:6, scout:false, engineer:false },
-    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, regen:0, scout:false, engineer:true }
+    assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, regen:0, scout:false, engineer:false },
+    tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, regen:0, scout:false, engineer:false },
+    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, regen:0, scout:true, engineer:false },
+    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, regen:9, scout:false, engineer:false },
+    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, regen:0, scout:false, engineer:true }
   };
   let hero = 'assault';
   let mode = 'endless';
@@ -483,9 +483,10 @@
   function heroStats() { return HEROES[hero]; }
   function heroPerk(h) {
     if (h.engineer) return '技能：建造炮台协助攻击（G）';
-    if (h.scout) return '加成：雷达预判敌人方向（左上雷达）';
-    if (h.regen > 0) return '加成：脱战 3 秒自动回血';
-    if (h.dmgMult > 1) return '加成：武器伤害 ×' + h.dmgMult + '，移速较慢';
+    if (h.scout) return '加成：雷达预判刷怪地点（右下）· 移速快';
+    if (h.regen > 0) return '加成：脱战 3 秒自动回血，医疗包更有效';
+    if (h.dmgMult > 1) return '加成：武器伤害 ×' + h.dmgMult + '，突击主力';
+    if (h.resMult < 1) return '加成：受到伤害 ×' + h.resMult + '，高血量耐扛';
     return '加成：均衡';
   }
   function applyHero() {
@@ -713,15 +714,18 @@
     };
   }
 
-  function spawnEnemy(type) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 24 + Math.random() * 16;
-    const x = Math.cos(angle) * dist;
-    const z = Math.sin(angle) * dist;
+  function spawnEnemy(type, pos) {
+    let p = pos;
+    if (!p) { const ang = Math.random() * Math.PI * 2; const dist = 24 + Math.random() * 16; p = { x: Math.cos(ang) * dist, z: Math.sin(ang) * dist }; }
     const e = makeEnemy(type);
     Object.assign(e, enemyProto);
-    e.group.position.set(x, 0, z);
+    e.group.position.set(p.x, 0, p.z);
     enemies.push(e);
+  }
+  function randomSpawnPos() {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 24 + Math.random() * 16;
+    return { x: Math.cos(ang) * dist, z: Math.sin(ang) * dist };
   }
 
   function pickEnemyType() {
@@ -846,23 +850,38 @@
     const show = (hero === 'scout');
     radar.style.display = show ? '' : 'none';
     if (!show) return;
-    const dots = radar.querySelectorAll('.radar-dot');
-    const R = 36, cos = Math.cos(player.yaw), sin = Math.sin(player.yaw);
+    const R = 48, cos = Math.cos(player.yaw), sin = Math.sin(player.yaw);
+    // 预判刷怪点（青色）
+    const spawnDots = radar.querySelectorAll('.radar-dot.spawn');
     let k = 0;
-    enemies.forEach(function (e) {
-      if (k >= dots.length) return;
-      const dx = e.group.position.x - player.pos.x;
-      const dz = e.group.position.z - player.pos.z;
+    spawnQueue.forEach(function (it) {
+      if (k >= spawnDots.length) return;
+      const pos = it.pos || it;
+      const dx = pos.x - player.pos.x, dz = pos.z - player.pos.z;
       const dist = Math.hypot(dx, dz);
       if (dist > R) return;
-      const right = dx * cos - dz * sin;
-      const fwd = -dx * sin - dz * cos;
-      const dot = dots[k++];
+      const right = dx * cos - dz * sin, fwd = -dx * sin - dz * cos;
+      const dot = spawnDots[k++];
       dot.style.opacity = 1;
       dot.style.left = (50 + right / R * 50) + '%';
       dot.style.top = (50 - fwd / R * 50) + '%';
     });
-    for (let i = k; i < dots.length; i++) dots[i].style.opacity = 0;
+    for (let i = k; i < spawnDots.length; i++) spawnDots[i].style.opacity = 0;
+    // 当前敌人（红）
+    const enemyDots = radar.querySelectorAll('.radar-dot:not(.spawn)');
+    let j = 0;
+    enemies.forEach(function (e) {
+      if (j >= enemyDots.length) return;
+      const dx = e.group.position.x - player.pos.x, dz = e.group.position.z - player.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > R) return;
+      const right = dx * cos - dz * sin, fwd = -dx * sin - dz * cos;
+      const dot = enemyDots[j++];
+      dot.style.opacity = 1;
+      dot.style.left = (50 + right / R * 50) + '%';
+      dot.style.top = (50 - fwd / R * 50) + '%';
+    });
+    for (let i = j; i < enemyDots.length; i++) enemyDots[i].style.opacity = 0;
   }
 
   /* ---------- 波次 ---------- */
@@ -881,10 +900,10 @@
     spawnQueue = [];
     const count = DIFF.baseCount + n * DIFF.countPerWave;
     enemyCount = count;
-    for (let i = 0; i < count; i++) spawnQueue.push(pickEnemyType());
+    for (let i = 0; i < count; i++) spawnQueue.push({ type: pickEnemyType(), pos: randomSpawnPos() });
     const campBoss = (mode === 'campaign' && currentLevel >= 3 && n === LEVELS[currentLevel].waves);
     const endBoss = (mode === 'endless' && wave >= 5 && wave % 5 === 0);
-    if (campBoss || endBoss) { spawnQueue.push('boss'); enemyCount++; }
+    if (campBoss || endBoss) { spawnQueue.push({ type: 'boss', pos: randomSpawnPos() }); enemyCount++; }
     spawnTimer = 0;
     showBanner((campBoss || endBoss) ? '⚠ BOSS 来袭 ⚠' : (mode === 'campaign' ? 'Lv.' + (currentLevel + 1) + ' 第 ' + n + ' 波' : '第 ' + n + ' 波'));
     waveEl.textContent = n;
@@ -1170,6 +1189,7 @@
   /* ---------- 受击 ---------- */
   function damagePlayer(dmg) {
     if (!player.alive) return;
+    dmg = Math.max(1, Math.round(dmg * heroStats().resMult));
     player.hp -= dmg;
     lastHurtTime = timeNow;
     shake += 0.9;
@@ -2043,15 +2063,16 @@
     if (waveState === 'spawning') {
       spawnTimer -= dt;
       if (spawnTimer <= 0 && spawnQueue.length > 0) {
-        spawnEnemy(spawnQueue.shift());
+        const it = spawnQueue.shift();
+        spawnEnemy(it.type, it.pos);
         spawnTimer = Math.max(0.18, 1.0 - wave * 0.06);
       }
       if (spawnQueue.length === 0) waveState = 'fighting';
     } else if (waveState === 'fighting') {
       if (enemies.length === 0) {
         waveState = 'cleared';
-        waveDelay = 2.2;
-        showBanner('波次肃清！');
+        waveDelay = (mode === 'endless' ? 10 : 2.2);
+        showBanner(mode === 'endless' ? '10 秒后刷新下一波…' : '波次肃清！');
       }
     } else if (waveState === 'cleared') {
       waveDelay -= dt;
