@@ -125,6 +125,10 @@
   .upg-level{color:#35e0ff;font-weight:700;}
   .upg-cost{color:#ffd166;}
   .hero-desc{color:#8fa7cc;font-size:12px;letter-spacing:1px;margin:2px 0 4px;min-height:14px;}
+  .level-select{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 12px;}
+  .level-btn{padding:8px 12px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.07);color:#cfe0f5;cursor:pointer;}
+  .level-btn.active{background:linear-gradient(90deg,#35e0ff,#7fffd4);color:#04121a;border-color:transparent;}
+  .level-btn.locked{opacity:.45;cursor:not-allowed;}
   /* 侦察兵雷达 */
   #radar{position:fixed;right:16px;bottom:150px;width:120px;height:120px;border:1px solid rgba(140,190,255,.4);border-radius:50%;background:rgba(8,14,24,.5);z-index:6;pointer-events:none;display:none;}
   #radar::before,#radar::after{content:"";position:absolute;left:50%;top:50%;background:rgba(140,190,255,.18);}
@@ -182,6 +186,7 @@
       <button id="mode-endless" class="mode-btn active">无尽模式</button>
       <button id="mode-campaign" class="mode-btn">关卡模式</button>
     </div>
+    <div class="level-select" id="level-select"></div>
     <div class="sub">选择英雄</div>
     <div class="hero-row" id="hero-row">
       <button class="hero-btn active" data-hero="assault">突击手</button>

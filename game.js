@@ -416,6 +416,8 @@
   let meleeSwing = 0;
   let runStartCoins = 0;
   let lastHurtTime = -99;
+  let currentLevel = 0;
+  let saveUnlocked = 0;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
   const upgrades = { pistol:0, smg:0, rifle:0, shotgun:0, sniper:0, lmg:0, melee:0 };
 
@@ -429,15 +431,44 @@
         if (typeof d.medkits === 'number') medkits = d.medkits;
         WEAPON_ORDER.forEach(function (t) { if (t in d.owned) owned[t] = !!d.owned[t]; });
         WEAPON_ORDER.forEach(function (t) { upgrades[t] = (d.upgrades && d.upgrades[t]) || 0; });
+        if (typeof d.unlocked === 'number') saveUnlocked = Math.min(d.unlocked, 99);
       }
     } catch (e) {}
   }
   function saveGame() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ coins: coins, medkits: medkits, owned: owned, upgrades: upgrades })); } catch (e) {}
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ coins: coins, medkits: medkits, owned: owned, upgrades: upgrades, unlocked: saveUnlocked })); } catch (e) {}
   }
   function upgradeCost(type) {
     const lv = upgrades[type] || 0;
     return 300 + lv * 400 + lv * lv * 80;
+  }
+  const LEVELS = [
+    { name:'前线营地', waves:3, pool:['walker','runner'] },
+    { name:'密林伏击', waves:3, pool:['walker','runner','shooter'] },
+    { name:'废墟战场', waves:4, pool:['walker','runner','shooter','exploder'] },
+    { name:'钢铁工厂', waves:4, pool:['walker','brute','shooter','exploder','flyer'] },
+    { name:'重装要塞', waves:5, pool:['walker','brute','shooter','flyer'] },
+    { name:'最终决战', waves:5, pool:['walker','runner','brute','shooter','exploder','flyer'] }
+  ];
+  function worldWave() {
+    return wave + (mode === 'campaign' ? currentLevel * LEVELS[currentLevel].waves : 0);
+  }
+  function buildLevelSelect() {
+    const cont = document.getElementById('level-select');
+    if (!cont) return;
+    cont.innerHTML = '';
+    LEVELS.forEach(function (lv, i) {
+      const b = document.createElement('button');
+      b.className = 'level-btn';
+      b.textContent = 'Lv.' + (i + 1) + ' ' + lv.name;
+      b.dataset.i = i;
+      b.addEventListener('click', function () {
+        if (i > saveUnlocked) return;
+        currentLevel = i;
+        updateMenuUI();
+      });
+      cont.appendChild(b);
+    });
   }
   function wStats(type) {
     const cfg = WEAPONS[type];
@@ -653,13 +684,14 @@
     const meshes = [];
     grp.traverse(function (o) { if (o.isMesh && o.geometry) meshes.push(o); });
 
-    const waveScale = 1 + (wave - 1) * DIFF.hpPerWave;
+    const wv = worldWave();
+    const waveScale = 1 + (wv - 1) * DIFF.hpPerWave;
     return {
       type, cfg, group: grp, meshes, bodyMesh: body,
       hp: cfg.hp * waveScale,
       maxHp: cfg.hp * waveScale,
-      dmgScale: 1 + (wave - 1) * DIFF.dmgPerWave,
-      spdScale: 1 + Math.min(DIFF.speedCap, (wave - 1) * DIFF.speedPerWave),
+      dmgScale: 1 + (wv - 1) * DIFF.dmgPerWave,
+      spdScale: 1 + Math.min(DIFF.speedCap, (wv - 1) * DIFF.speedPerWave),
       walkPhase: Math.random() * Math.PI * 2,
       hitCooldown: 0,
       attackCooldown: Math.random() * 0.5,
@@ -683,6 +715,10 @@
   }
 
   function pickEnemyType() {
+    if (mode === 'campaign') {
+      const pool = LEVELS[currentLevel].pool;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
     const r = Math.random();
     if (wave >= 4 && r < 0.14) return 'flyer';
     if (wave >= 3 && r < 0.30) return 'exploder';
@@ -789,7 +825,7 @@
         const to = nearest.group.position.clone().add(new THREE.Vector3(0, 1, 0));
         spawnTracer(from, to);
         spawnFlash(from);
-        nearest.takeDamage(Math.round(12 * (1 + (wave - 1) * 0.20)), null);
+        nearest.takeDamage(Math.round(12 * (1 + (worldWave() - 1) * 0.20)), null);
         burstSparks(to, 0xffc46b, 3);
       }
     }
@@ -837,7 +873,7 @@
     enemyCount = count;
     for (let i = 0; i < count; i++) spawnQueue.push(pickEnemyType());
     spawnTimer = 0;
-    showBanner('第 ' + n + ' 波');
+    showBanner(mode === 'campaign' ? 'Lv.' + (currentLevel + 1) + ' 第 ' + n + ' 波' : '第 ' + n + ' 波');
     waveEl.textContent = n;
   }
 
@@ -1246,6 +1282,16 @@
     if (notice) { const n = document.getElementById('death-note'); if (n) n.textContent = notice; }
     updateMenuUI();
   }
+  function levelComplete() {
+    const lv = LEVELS[currentLevel];
+    const bonus = 300 + currentLevel * 200 + wave * 30;
+    coins += bonus;
+    if (currentLevel < LEVELS.length - 1 && saveUnlocked < currentLevel + 1) saveUnlocked = Math.min(LEVELS.length - 1, currentLevel + 1);
+    saveGame();
+    player.alive = false;
+    const msg = (currentLevel >= LEVELS.length - 1) ? '全部通关！' : '解锁下一关';
+    showMainMenu('通关「' + lv.name + '」· ' + msg + ' · 奖励 +' + bonus + ' 金币');
+  }
   function exitToMenu() {
     if (!gameStarted) return;
     const earned = Math.max(0, coins - runStartCoins);
@@ -1257,10 +1303,12 @@
     const c = document.getElementById('menu-coins'); if (c) c.textContent = coins;
     const mk = document.getElementById('menu-medkits'); if (mk) mk.textContent = medkits;
     const ci = document.getElementById('campaign-info');
-    if (ci) ci.textContent = (mode === 'campaign' ? '关卡模式 · 通关 ' + DIFF.campaignWaves + ' 波获胜' : '无尽模式 · 挑战最高波');
+    if (ci) ci.textContent = (mode === 'campaign' ? '关卡模式 · 已解锁 ' + (saveUnlocked + 1) + '/' + LEVELS.length + ' 关' : '无尽模式 · 挑战最高波');
     const e = document.getElementById('mode-endless'); if (e) e.classList.toggle('active', mode === 'endless');
     const c2 = document.getElementById('mode-campaign'); if (c2) c2.classList.toggle('active', mode === 'campaign');
     const hd = document.getElementById('hero-desc'); if (hd) hd.textContent = heroPerk(HEROES[hero]);
+    const ls = document.getElementById('level-select');
+    if (ls) { ls.style.display = (mode === 'campaign') ? '' : 'none'; ls.querySelectorAll('.level-btn').forEach(function (b) { const i = +b.dataset.i; b.classList.toggle('active', i === currentLevel); b.classList.toggle('locked', i > saveUnlocked); b.disabled = i > saveUnlocked; }); }
   }
   function toggleUpgrade() {
     const up = document.getElementById('upgrade-overlay');
@@ -1966,12 +2014,8 @@
     } else if (waveState === 'cleared') {
       waveDelay -= dt;
       if (waveDelay <= 0) {
-        if (mode === 'campaign' && wave >= DIFF.campaignWaves) {
-          const bonus = 500 + wave * 50;
-          coins += bonus;
-          saveGame();
-          player.alive = false;
-          showMainMenu('通关成功！坚持到第 ' + wave + ' 波 · 奖励 +' + bonus + ' 金币');
+        if (mode === 'campaign' && wave >= LEVELS[currentLevel].waves) {
+          levelComplete();
         } else {
           startWave(wave + 1);
         }
@@ -2018,6 +2062,7 @@
   /* ---------- 启动渲染循环 ---------- */
   loadSave();
   buildUpgradeList();
+  buildLevelSelect();
   applyView();
   updateHudAmmo();
   updateHud();
