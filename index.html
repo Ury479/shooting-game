@@ -111,6 +111,19 @@
   #btn-heal{left:26px;bottom:170px;width:60px;height:60px;font-size:13px;}
   #btn-shop{left:96px;bottom:170px;width:60px;height:60px;font-size:13px;}
   #btn-jump{left:166px;bottom:170px;width:60px;height:60px;font-size:13px;}
+  /* 主界面菜单 */
+  .menu-coins{font-size:15px;font-weight:700;color:#ffd166;margin-bottom:8px;}
+  .campaign-info{color:#8fa7cc;font-size:13px;margin-bottom:10px;}
+  .mode-row{display:flex;gap:10px;justify-content:center;margin:4px 0 16px;}
+  .mode-btn{padding:10px 22px;font-size:15px;font-weight:700;border-radius:10px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.06);color:#cfe0f5;cursor:pointer;letter-spacing:2px;}
+  .mode-btn.active{background:linear-gradient(90deg,#35e0ff,#7fffd4);color:#04121a;border-color:transparent;}
+  .menu-actions{display:flex;gap:10px;justify-content:center;margin:16px 0 6px;flex-wrap:wrap;}
+  .menu-actions button{font-size:16px;}
+  #menu-shop,#menu-upgrade{padding:12px 24px;font-size:15px;font-weight:700;letter-spacing:2px;border-radius:12px;border:1px solid rgba(140,190,255,.4);background:rgba(255,255,255,.08);color:#eaf2ff;cursor:pointer;}
+  .death-note{color:#ff9d8a;font-size:14px;letter-spacing:1px;margin:8px 0 4px;min-height:18px;}
+  .upg-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px dashed rgba(140,190,255,.18);font-size:14px;}
+  .upg-level{color:#35e0ff;font-weight:700;}
+  .upg-cost{color:#ffd166;}
 </style>
 </head>
 <body>
@@ -154,19 +167,12 @@
   <div class="card">
     <h1>火力前线</h1>
     <div class="sub">FIREFRONT · 3D 射击生存</div>
-    <div class="controls">
-      <div><span>移动</span><span class="k">W A S D</span></div>
-      <div><span>视角 / 瞄准</span><span class="k">鼠标</span></div>
-      <div><span>射击 / 近战</span><span class="k">鼠标左键</span></div>
-      <div><span>切换武器</span><span class="k">1–7 / Q</span></div>
-      <div><span>跳跃</span><span class="k">空格</span></div>
-      <div><span>翻滚闪避</span><span class="k">C</span></div>
-      <div><span>换弹</span><span class="k">R</span></div>
-      <div><span>冲刺</span><span class="k">Shift</span></div>
-      <div><span>商店 / 医疗</span><span class="k">B / H</span></div>
-      <div><span>暂停</span><span class="k">Esc</span></div>
+    <div class="menu-coins">金币 <span id="menu-coins" class="big">0</span> · 医疗包 <span id="menu-medkits" class="big">0</span></div>
+    <div id="campaign-info" class="campaign-info">无尽模式 · 挑战最高波</div>
+    <div class="mode-row">
+      <button id="mode-endless" class="mode-btn active">无尽模式</button>
+      <button id="mode-campaign" class="mode-btn">关卡模式</button>
     </div>
-    <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
     <div class="sub">选择英雄</div>
     <div class="hero-row" id="hero-row">
       <button class="hero-btn active" data-hero="assault">突击手</button>
@@ -174,7 +180,13 @@
       <button class="hero-btn" data-hero="scout">侦察兵</button>
       <button class="hero-btn" data-hero="medic">医疗兵</button>
     </div>
-    <button id="start-btn">开 始 游 戏</button>
+    <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
+    <div class="menu-actions">
+      <button id="start-btn">进 入 战 斗</button>
+      <button id="menu-shop">商 店</button>
+      <button id="menu-upgrade">升 级</button>
+    </div>
+    <div id="death-note" class="death-note"></div>
     <div class="view-note">默认第一人称 · 暂停菜单可切换第三人称</div>
   </div>
 </div>
@@ -225,6 +237,15 @@
     <div class="shop-item"><span>轻机枪 · 大弹匣</span><button id="buy-lmg" class="shop-btn">购买 1500 金币</button></div>
     <div class="shop-item"><span>医疗包 · 回血</span><button id="buy-medkit" class="shop-btn">医疗包 150 金币</button></div>
     <button id="shop-close" class="shop-btn" style="width:100%;margin-top:10px;">关 闭</button>
+  </div>
+</div>
+
+<div id="upgrade-overlay" class="overlay hidden">
+  <div class="card" style="text-align:left;max-height:84vh;overflow:auto;">
+    <h1 style="font-size:26px;text-align:center;">装 备 升 级</h1>
+    <div class="sub" style="text-align:center;">金币 <span id="upgrade-coins">0</span></div>
+    <div id="upgrade-list"></div>
+    <button id="upgrade-close" class="shop-btn" style="width:100%;margin-top:10px;">关 闭</button>
   </div>
 </div>
 

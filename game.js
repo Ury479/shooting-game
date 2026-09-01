@@ -22,7 +22,8 @@
     countPerWave: 3,        // 每波新增数量
     healAmount: 40,         // 医疗包回复量
     medkitCap: 3,           // 医疗包持有上限
-    medkitPrice: 200        // 医疗包价格
+    medkitPrice: 200,       // 医疗包价格
+    campaignWaves: 10       // 关卡模式通关波数
   };
 
   /* ---------- DOM ---------- */
@@ -408,10 +409,44 @@
     medic:   { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5 }
   };
   let hero = 'assault';
+  let mode = 'endless';
   let coins = 0;
   let medkits = 0;
   let meleeSwing = 0;
+  let runStartCoins = 0;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
+  const upgrades = { pistol:0, smg:0, rifle:0, shotgun:0, sniper:0, lmg:0, melee:0 };
+
+  // ---- 进度持久化 ----------------
+  const SAVE_KEY = 'shooting_save_v1';
+  function loadSave() {
+    try {
+      const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (d && typeof d === 'object') {
+        if (typeof d.coins === 'number') coins = d.coins;
+        if (typeof d.medkits === 'number') medkits = d.medkits;
+        WEAPON_ORDER.forEach(function (t) { if (t in d.owned) owned[t] = !!d.owned[t]; });
+        WEAPON_ORDER.forEach(function (t) { upgrades[t] = (d.upgrades && d.upgrades[t]) || 0; });
+      }
+    } catch (e) {}
+  }
+  function saveGame() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ coins: coins, medkits: medkits, owned: owned, upgrades: upgrades })); } catch (e) {}
+  }
+  function upgradeCost(type) {
+    const lv = upgrades[type] || 0;
+    return 300 + lv * 400 + lv * lv * 80;
+  }
+  function wStats(type) {
+    const cfg = WEAPONS[type];
+    const lv = upgrades[type] || 0;
+    return {
+      damage: Math.round(cfg.damage * (1 + lv * 0.15)),
+      mag: Math.round(cfg.mag * (1 + lv * 0.2)),
+      interval: cfg.interval * Math.pow(0.96, lv),
+      reload: cfg.reload * Math.pow(0.97, lv)
+    };
+  }
   function heroStats() { return HEROES[hero]; }
   function applyHero() {
     const h = HEROES[hero];
@@ -699,8 +734,9 @@
     else if (type === 'medkit') { medkits = Math.min(DIFF.medkitCap, medkits + 1); showBanner('获得医疗包'); }
     else { WEAPON_ORDER.forEach(function (t) { if (owned[t]) reserve[t] = Math.min(999, reserve[t] + Math.ceil(WEAPONS[t].mag / 2)); }); showBanner('弹药补充'); }
     playSound('pickup');
+    saveGame();
     updateHud();
-    updateShopUI();
+    updateShopUI(); updateMenuUI();
   }
 
   /* ---------- 波次 ---------- */
@@ -843,7 +879,7 @@
       if (dist < range + e.cfg.scale) {
         const toE = new THREE.Vector3(dx, 0, dz).normalize();
         if (fwd3.angleTo(toE) < 1.0) {
-          e.takeDamage(WEAPONS.melee.damage, toE);
+          e.takeDamage(wStats('melee').damage, toE);
           burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xffe6a0, 6);
           hitAny = true;
         }
@@ -891,13 +927,15 @@
     shake += 0.9;
     playSound('explode');
     score += e.cfg.score; kills += 1; coins += Math.round(e.cfg.score / 2);
+    saveGame(); updateShopUI(); updateMenuUI();
     dropLoot(e.group.position.clone(), 'coin');
   }
 
   function tryFire() {
     const cfg = currentCfg();
+    const ws = wStats(currentWeapon);
     if (!player.alive || reloading || switchTimer > 0) return;
-    if (timeNow - lastShotAt < cfg.interval) return;
+    if (timeNow - lastShotAt < ws.interval) return;
     if (currentWeapon === 'melee') { meleeAttack(); return; }
     if (ammo[currentWeapon] <= 0) {
       playSound('empty');
@@ -936,7 +974,7 @@
 
       spawnTracer(muzzle, end);
       if (hitEnemy) {
-        hitEnemy.takeDamage(cfg.damage, dir);
+        hitEnemy.takeDamage(ws.damage, dir);
         hitmark(0);
         burstSparks(end, 0xffc46b, 3);
       } else {
@@ -980,18 +1018,18 @@
   }
 
   function startReload() {
-    const cfg = currentCfg();
+    const ws = wStats(currentWeapon);
     if (reloading) return;
-    if (ammo[currentWeapon] >= cfg.mag) return;
+    if (ammo[currentWeapon] >= ws.mag) return;
     if (reserve[currentWeapon] <= 0) return;
     reloading = true;
-    reloadTimer = cfg.reload;
+    reloadTimer = ws.reload;
     reloadHintEl.textContent = '换弹中…';
     playSound('reload');
   }
   function finishReload() {
-    const cfg = currentCfg();
-    const need = cfg.mag - ammo[currentWeapon];
+    const ws = wStats(currentWeapon);
+    const need = ws.mag - ammo[currentWeapon];
     const take = Math.min(need, reserve[currentWeapon]);
     ammo[currentWeapon] += take;
     reserve[currentWeapon] -= take;
@@ -1079,23 +1117,25 @@
 
   function startGame() {
     score = 0; kills = 0;
+    runStartCoins = coins;
     applyHero();
     player.hp = player.maxHp; player.stamina = player.maxStamina; player.alive = true;
     player.pos.set(0, 0, 0); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
+    player.vy = 0; player.onGround = true;
     enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); });
     enemies.length = 0;
-    WEAPON_ORDER.forEach(function (t) { ammo[t] = WEAPONS[t].mag; reserve[t] = WEAPONS[t].reserve; });
+    WEAPON_ORDER.forEach(function (t) { ammo[t] = wStats(t).mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
-    dodgeT = 0; dodgeCd = 0; shake = 0;
-    coins = 0; medkits = 0; meleeSwing = 0;
-    owned.pistol = true; owned.smg = false; owned.rifle = false; owned.shotgun = false; owned.sniper = false; owned.lmg = false; owned.melee = true;
+    dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
     currentWeapon = 'pistol';
     applyView();
     startWave(1);
     updateHudAmmo();
     updateHud();
-    updateShopUI();
+    updateShopUI(); updateMenuUI();
     deathOverlay.classList.add('hidden');
+    document.getElementById('shop-overlay').classList.add('hidden');
+    document.getElementById('upgrade-overlay').classList.add('hidden');
     startOverlay.classList.add('hidden');
     gameStarted = true;
   }
@@ -1106,11 +1146,77 @@
     firing = false;
     shake = 0;
     recoilCam = 0;
-    finalScoreEl.textContent = score;
-    finalWaveEl.textContent = wave;
-    finalKillsEl.textContent = kills;
-    deathOverlay.classList.remove('hidden');
+    const earned = Math.max(0, coins - runStartCoins);
+    saveGame();
     document.exitPointerLock && document.exitPointerLock();
+    showMainMenu('战败 · 坚持到第 ' + wave + ' 波 · 本局 +' + earned + ' 金币');
+  }
+  function showMainMenu(notice) {
+    gameStarted = false;
+    running = false; firing = false;
+    pauseOverlay.classList.add('hidden');
+    document.getElementById('shop-overlay').classList.add('hidden');
+    document.getElementById('upgrade-overlay').classList.add('hidden');
+    deathOverlay.classList.add('hidden');
+    startOverlay.classList.remove('hidden');
+    if (notice) { const n = document.getElementById('death-note'); if (n) n.textContent = notice; }
+    updateMenuUI();
+  }
+  function updateMenuUI() {
+    const c = document.getElementById('menu-coins'); if (c) c.textContent = coins;
+    const mk = document.getElementById('menu-medkits'); if (mk) mk.textContent = medkits;
+    const ci = document.getElementById('campaign-info');
+    if (ci) ci.textContent = (mode === 'campaign' ? '关卡模式 · 通关 ' + DIFF.campaignWaves + ' 波获胜' : '无尽模式 · 挑战最高波');
+    const e = document.getElementById('mode-endless'); if (e) e.classList.toggle('active', mode === 'endless');
+    const c2 = document.getElementById('mode-campaign'); if (c2) c2.classList.toggle('active', mode === 'campaign');
+  }
+  function toggleUpgrade() {
+    const up = document.getElementById('upgrade-overlay');
+    if (!up) return;
+    const opening = up.classList.contains('hidden');
+    if (opening) {
+      if (gameStarted) { running = false; firing = false; }
+      up.classList.remove('hidden');
+      updateUpgradeUI();
+    } else {
+      up.classList.add('hidden');
+      if (gameStarted) { running = true; if (!isTouch) requestLock(); }
+    }
+  }
+  function buildUpgradeList() {
+    const list = document.getElementById('upgrade-list');
+    if (!list) return;
+    list.innerHTML = '';
+    WEAPON_ORDER.forEach(function (t) {
+      const row = document.createElement('div');
+      row.className = 'upg-row';
+      row.id = 'upg-' + t;
+      row.innerHTML = '<span>' + WEAPONS[t].name + '</span><span class="upg-level">Lv.0</span><span class="upg-cost">升级 300 金币</span><button class="upg-btn shop-btn">升级</button>';
+      const btn = row.querySelector('.upg-btn');
+      if (btn) btn.addEventListener('click', function () { upgradeWeapon(t); });
+      list.appendChild(row);
+    });
+  }
+  function updateUpgradeUI() {
+    const c = document.getElementById('upgrade-coins'); if (c) c.textContent = coins;
+    WEAPON_ORDER.forEach(function (t) {
+      const row = document.getElementById('upg-' + t);
+      if (!row) return;
+      const lvl = row.querySelector('.upg-level'); if (lvl) lvl.textContent = 'Lv.' + (upgrades[t] || 0);
+      const cost = row.querySelector('.upg-cost'); if (cost) cost.textContent = '升级 ' + upgradeCost(t) + ' 金币';
+      const btn = row.querySelector('.upg-btn');
+      if (btn) { btn.disabled = !owned[t] || coins < upgradeCost(t); btn.textContent = owned[t] ? '升级' : '未拥有'; }
+    });
+  }
+  function upgradeWeapon(type) {
+    if (!owned[type]) return;
+    const cost = upgradeCost(type);
+    if (coins < cost) { playSound('noMoney'); showBanner('金币不足'); return; }
+    coins -= cost;
+    upgrades[type] = (upgrades[type] || 0) + 1;
+    saveGame();
+    playSound('buy');
+    updateUpgradeUI(); updateMenuUI(); updateShopUI(); updateHudAmmo();
   }
 
   /* ---------- 输入（键盘 + 鼠标/触摸，兼容指针锁定失败） ---------- */
@@ -1335,25 +1441,24 @@
     if (!player.alive || player.hp >= player.maxHp) return;
     if (medkits <= 0) { showBanner('没有医疗包'); return; }
     medkits--;
+    saveGame();
     player.hp = Math.min(player.maxHp, player.hp + DIFF.healAmount * heroStats().healMult);
     playSound('heal');
     updateHud();
-    updateShopUI();
+    updateShopUI(); updateMenuUI();
   }
   let shopOpen = false;
   function toggleShop() {
-    if (!gameStarted || !player.alive) return;
     const shop = document.getElementById('shop-overlay');
     if (!shop) return;
     shopOpen = !shopOpen;
     if (shopOpen) {
-      running = false; firing = false;
+      if (gameStarted) { running = false; firing = false; }
       shop.classList.remove('hidden');
       updateShopUI();
     } else {
       shop.classList.add('hidden');
-      running = true;
-      if (!isTouch) requestLock();
+      if (gameStarted) { running = true; if (!isTouch) requestLock(); }
     }
   }
   function buyWeapon(type) {
@@ -1362,8 +1467,9 @@
     if (coins < price) { playSound('noMoney'); showBanner('金币不足'); return; }
     coins -= price;
     owned[type] = true;
+    saveGame();
     playSound('buy');
-    updateShopUI();
+    updateShopUI(); updateMenuUI();
     updateHud();
   }
   function buyMedkit() {
@@ -1371,8 +1477,9 @@
     if (medkits >= DIFF.medkitCap) { showBanner('医疗包已满'); return; }
     coins -= DIFF.medkitPrice;
     medkits++;
+    saveGame();
     playSound('buy');
-    updateShopUI();
+    updateShopUI(); updateMenuUI();
     updateHud();
   }
   function updateShopUI() {
@@ -1436,6 +1543,16 @@
       document.querySelectorAll('#hero-row .hero-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
     });
   });
+  const modeEnd = document.getElementById('mode-endless');
+  const modeCamp = document.getElementById('mode-campaign');
+  if (modeEnd) modeEnd.addEventListener('click', function () { mode = 'endless'; updateMenuUI(); });
+  if (modeCamp) modeCamp.addEventListener('click', function () { mode = 'campaign'; updateMenuUI(); });
+  const menuShop = document.getElementById('menu-shop');
+  if (menuShop) menuShop.addEventListener('click', function () { toggleShop(); });
+  const menuUpg = document.getElementById('menu-upgrade');
+  if (menuUpg) menuUpg.addEventListener('click', function () { toggleUpgrade(); });
+  const upgClose = document.getElementById('upgrade-close');
+  if (upgClose) upgClose.addEventListener('click', function () { toggleUpgrade(); });
 
   window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1711,6 +1828,7 @@
       score += this.cfg.score;
       kills += 1;
       coins += Math.round(this.cfg.score / 2);
+      saveGame(); updateShopUI(); updateMenuUI();
       hitmark(1);
       playSound('kill');
       burstSparks(this.group.position.clone().add(new THREE.Vector3(0, 1, 0)), this.cfg.color, 14);
@@ -1743,7 +1861,17 @@
       }
     } else if (waveState === 'cleared') {
       waveDelay -= dt;
-      if (waveDelay <= 0) startWave(wave + 1);
+      if (waveDelay <= 0) {
+        if (mode === 'campaign' && wave >= DIFF.campaignWaves) {
+          const bonus = 500 + wave * 50;
+          coins += bonus;
+          saveGame();
+          player.alive = false;
+          showMainMenu('通关成功！坚持到第 ' + wave + ' 波 · 奖励 +' + bonus + ' 金币');
+        } else {
+          startWave(wave + 1);
+        }
+      }
     }
   }
 
@@ -1784,9 +1912,11 @@
   }
 
   /* ---------- 启动渲染循环 ---------- */
-  // 初始：第一人称，显示步枪
+  loadSave();
+  buildUpgradeList();
   applyView();
   updateHudAmmo();
   updateHud();
+  updateMenuUI();
   animate();
 })();
