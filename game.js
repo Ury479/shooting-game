@@ -405,11 +405,11 @@
 
   /* ---------- 英雄 / 货币 / 装备 ---------- */
   const HEROES = {
-    assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, scout:false, engineer:false, skill:'damage' },
-    tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, scout:false, engineer:false, skill:'shield' },
-    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'speed' },
-    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, scout:false, engineer:false, skill:'heal' },
-    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret' }
+    assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, scout:false, engineer:false, skill:'damage', shieldRegen:12 },
+    tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, scout:false, engineer:false, skill:'shield', shieldRegen:16 },
+    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'speed', shieldRegen:10 },
+    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, scout:false, engineer:false, skill:'heal', shieldRegen:20 },
+    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret', shieldRegen:10 }
   };
   let hero = 'assault';
   let mode = 'endless';
@@ -492,7 +492,7 @@
     else if (h.scout) extra = ' · 雷达预判刷怪';
     else if (h.engineer) extra = ' · 自动炮台';
     else if (h.healMult > 1) extra = ' · 医疗包×' + h.healMult;
-    return '技能[V]：' + skName + extra;
+    return '技能[G]：' + skName + extra;
   }
   function applyHero() {
     const h = HEROES[hero];
@@ -818,9 +818,9 @@
   let turretCooldown = 0;
   function useHeroSkill() {
     if (!gameStarted || !player.alive || !running) return;
-    if (skillCd > 0) { showBanner('技能冷却中'); return; }
     const h = heroStats();
     if (h.skill === 'turret') { buildTurret(); return; }
+    if (skillCd > 0) { showBanner('技能冷却中'); return; }
     if (h.skill === 'damage') { dmgBuff = 1.5; buffT = 6; skillCd = 20; showBanner('伤害提升！(6s)'); playSound('skill'); }
     else if (h.skill === 'shield') { player.shield = Math.min(player.maxShield * 1.5, player.shield + 60); skillCd = 20; showBanner('+60 护盾'); playSound('skill'); }
     else if (h.skill === 'speed') { spdBuff = 1.4; buffT = 6; skillCd = 20; showBanner('移速提升！(6s)'); playSound('skill'); }
@@ -1449,7 +1449,7 @@
     if (e.code === 'KeyB') toggleShop();
     if (e.code === 'Space') { e.preventDefault(); jump(); }
     if (e.code === 'KeyC') tryDodge();
-    if (e.code === 'KeyG') buildTurret();
+    if (e.code === 'KeyG') { e.preventDefault(); useHeroSkill(); }
     if (e.code === 'KeyV') { e.preventDefault(); useHeroSkill(); }
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
@@ -1820,7 +1820,7 @@
     if (!sprinting && dodgeT <= 0) player.stamina = Math.min(player.maxStamina, player.stamina + 16 * dt);
     // 护盾：脱战 3 秒后自动回复
     if (timeNow - lastHurtTime > 3 && player.shield < player.maxShield) {
-      player.shield = Math.min(player.maxShield, player.shield + 12 * dt);
+      player.shield = Math.min(player.maxShield, player.shield + heroStats().shieldRegen * dt);
     }
     // 技能 buff 计时 / 冷却
     buffT = Math.max(0, buffT - dt);
