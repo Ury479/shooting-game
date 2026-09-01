@@ -403,10 +403,11 @@
 
   /* ---------- 英雄 / 货币 / 装备 ---------- */
   const HEROES = {
-    assault: { name:'突击手', hp:100, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1 },
-    tank:    { name:'重装兵', hp:160, speed:4.4, stamina:130, color:0xb0563a, dark:0x7a3a26, healMult:1 },
-    scout:   { name:'侦察兵', hp:80, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1 },
-    medic:   { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5 }
+    assault:  { name:'突击手', hp:100, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1, regen:0, scout:false, engineer:false },
+    tank:     { name:'重装兵', hp:150, speed:4.2, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1.35, regen:0, scout:false, engineer:false },
+    scout:    { name:'侦察兵', hp:90, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, regen:0, scout:true, engineer:false },
+    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, regen:6, scout:false, engineer:false },
+    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, regen:0, scout:false, engineer:true }
   };
   let hero = 'assault';
   let mode = 'endless';
@@ -414,6 +415,7 @@
   let medkits = 0;
   let meleeSwing = 0;
   let runStartCoins = 0;
+  let lastHurtTime = -99;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
   const upgrades = { pistol:0, smg:0, rifle:0, shotgun:0, sniper:0, lmg:0, melee:0 };
 
@@ -448,6 +450,13 @@
     };
   }
   function heroStats() { return HEROES[hero]; }
+  function heroPerk(h) {
+    if (h.engineer) return '技能：建造炮台协助攻击（G）';
+    if (h.scout) return '加成：雷达预判敌人方向（左上雷达）';
+    if (h.regen > 0) return '加成：脱战 3 秒自动回血';
+    if (h.dmgMult > 1) return '加成：武器伤害 ×' + h.dmgMult + '，移速较慢';
+    return '加成：均衡';
+  }
   function applyHero() {
     const h = HEROES[hero];
     player.maxHp = h.hp;
@@ -739,6 +748,77 @@
     updateShopUI(); updateMenuUI();
   }
 
+  /* ---------- 工程兵炮台 / 侦察雷达 ---------- */
+  const MAX_TURRETS = 2, TURRET_INTERVAL = 0.8, TURRET_RANGE = 18;
+  let turrets = [];
+  let turretCooldown = 0;
+  function buildTurret() {
+    if (hero !== 'engineer') { showBanner('该英雄无炮台技能'); return; }
+    if (!gameStarted || !player.alive || !running) return;
+    if (turretCooldown > 0) { showBanner('炮台冷却中…'); return; }
+    if (turrets.length >= MAX_TURRETS) { showBanner('炮台数量已达上限'); return; }
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    const px = player.pos.x + fx * 3, pz = player.pos.z + fz * 3;
+    const grp = new THREE.Group();
+    const base = box(0.5, 0.4, 0.5, MAT.metal); base.position.y = 0.2; grp.add(base);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), MAT.bodyDark); head.position.y = 0.7; grp.add(head);
+    const barrel = cyl(0.06, 0.6, MAT.dark); barrel.position.set(0, 0.7, 0.3); grp.add(barrel);
+    const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.7, 0.62); grp.add(muzzle);
+    grp.position.set(px, 0, pz);
+    scene.add(grp);
+    turrets.push({ group: grp, muzzle: muzzle, fireCd: 0.5 });
+    turretCooldown = 8;
+    dustPuff(new THREE.Vector3(px, 0.2, pz), 8, true);
+    playSound('buy');
+  }
+  function updateTurrets(dt) {
+    for (let i = turrets.length - 1; i >= 0; i--) {
+      const t = turrets[i];
+      t.fireCd -= dt;
+      let nearest = null, nd = TURRET_RANGE;
+      enemies.forEach(function (e) {
+        if (!e.alive || e.dying) return;
+        const d = Math.hypot(e.group.position.x - t.group.position.x, e.group.position.z - t.group.position.z);
+        if (d < nd) { nd = d; nearest = e; }
+      });
+      if (!nearest) continue;
+      t.group.rotation.y = Math.atan2(nearest.group.position.x - t.group.position.x, nearest.group.position.z - t.group.position.z);
+      if (t.fireCd <= 0) {
+        t.fireCd = TURRET_INTERVAL;
+        const from = t.muzzle.getWorldPosition(new THREE.Vector3());
+        const to = nearest.group.position.clone().add(new THREE.Vector3(0, 1, 0));
+        spawnTracer(from, to);
+        spawnFlash(from);
+        nearest.takeDamage(Math.round(12 * (1 + (wave - 1) * 0.20)), null);
+        burstSparks(to, 0xffc46b, 3);
+      }
+    }
+  }
+  function updateRadar() {
+    const radar = document.getElementById('radar');
+    if (!radar) return;
+    const show = (hero === 'scout');
+    radar.style.display = show ? '' : 'none';
+    if (!show) return;
+    const dots = radar.querySelectorAll('.radar-dot');
+    const R = 36, cos = Math.cos(player.yaw), sin = Math.sin(player.yaw);
+    let k = 0;
+    enemies.forEach(function (e) {
+      if (k >= dots.length) return;
+      const dx = e.group.position.x - player.pos.x;
+      const dz = e.group.position.z - player.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > R) return;
+      const right = dx * cos - dz * sin;
+      const fwd = -dx * sin - dz * cos;
+      const dot = dots[k++];
+      dot.style.opacity = 1;
+      dot.style.left = (50 + right / R * 50) + '%';
+      dot.style.top = (50 - fwd / R * 50) + '%';
+    });
+    for (let i = k; i < dots.length; i++) dots[i].style.opacity = 0;
+  }
+
   /* ---------- 波次 ---------- */
   let wave = 0;
   let waveState = 'idle'; // idle | spawning | fighting | cleared
@@ -879,7 +959,7 @@
       if (dist < range + e.cfg.scale) {
         const toE = new THREE.Vector3(dx, 0, dz).normalize();
         if (fwd3.angleTo(toE) < 1.0) {
-          e.takeDamage(wStats('melee').damage, toE);
+          e.takeDamage(wStats('melee').damage * heroStats().dmgMult, toE);
           burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xffe6a0, 6);
           hitAny = true;
         }
@@ -974,7 +1054,7 @@
 
       spawnTracer(muzzle, end);
       if (hitEnemy) {
-        hitEnemy.takeDamage(ws.damage, dir);
+        hitEnemy.takeDamage(ws.damage * heroStats().dmgMult, dir);
         hitmark(0);
         burstSparks(end, 0xffc46b, 3);
       } else {
@@ -1042,6 +1122,7 @@
   function damagePlayer(dmg) {
     if (!player.alive) return;
     player.hp -= dmg;
+    lastHurtTime = timeNow;
     shake += 0.9;
     vignetteEl.style.opacity = 0.9;
     playSound('hurt');
@@ -1127,6 +1208,9 @@
     WEAPON_ORDER.forEach(function (t) { ammo[t] = wStats(t).mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
+    lastHurtTime = -99; turretCooldown = 0;
+    turrets.forEach(function (t) { scene.remove(t.group); });
+    turrets.length = 0;
     currentWeapon = 'pistol';
     applyView();
     startWave(1);
@@ -1176,6 +1260,7 @@
     if (ci) ci.textContent = (mode === 'campaign' ? '关卡模式 · 通关 ' + DIFF.campaignWaves + ' 波获胜' : '无尽模式 · 挑战最高波');
     const e = document.getElementById('mode-endless'); if (e) e.classList.toggle('active', mode === 'endless');
     const c2 = document.getElementById('mode-campaign'); if (c2) c2.classList.toggle('active', mode === 'campaign');
+    const hd = document.getElementById('hero-desc'); if (hd) hd.textContent = heroPerk(HEROES[hero]);
   }
   function toggleUpgrade() {
     const up = document.getElementById('upgrade-overlay');
@@ -1248,6 +1333,7 @@
     if (e.code === 'KeyB') toggleShop();
     if (e.code === 'Space') { e.preventDefault(); jump(); }
     if (e.code === 'KeyC') tryDodge();
+    if (e.code === 'KeyG') buildTurret();
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
   window.addEventListener('keyup', function (e) {
@@ -1385,6 +1471,7 @@
   bindBtn('btn-heal', function () { heal(); });
   bindBtn('btn-shop', function () { toggleShop(); });
   bindBtn('btn-jump', function () { jump(); });
+  bindBtn('btn-turret', function () { buildTurret(); });
   const sprintBtn = document.getElementById('btn-sprint');
   if (sprintBtn) {
     sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
@@ -1596,6 +1683,8 @@
       updateFlashes(dt);
       updatePickups(dt);
       updateEnemyBullets(dt);
+      updateTurrets(dt);
+      updateRadar();
     }
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
@@ -1610,6 +1699,12 @@
     // 体力恢复
     const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touch.sprint;
     if (!sprinting && dodgeT <= 0) player.stamina = Math.min(player.maxStamina, player.stamina + 16 * dt);
+    // 医疗兵：脱战 3 秒后自动回血
+    const hh = heroStats();
+    if (hh.regen > 0 && timeNow - lastHurtTime > 3 && player.hp < player.maxHp) {
+      player.hp = Math.min(player.maxHp, player.hp + hh.regen * dt);
+    }
+    if (turretCooldown > 0) turretCooldown -= dt;
 
     // 输入方向（键盘 + 触摸摇杆）
     let f = touch.f, s = touch.s;

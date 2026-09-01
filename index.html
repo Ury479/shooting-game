@@ -124,6 +124,14 @@
   .upg-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px dashed rgba(140,190,255,.18);font-size:14px;}
   .upg-level{color:#35e0ff;font-weight:700;}
   .upg-cost{color:#ffd166;}
+  .hero-desc{color:#8fa7cc;font-size:12px;letter-spacing:1px;margin:2px 0 4px;min-height:14px;}
+  /* 侦察兵雷达 */
+  #radar{position:fixed;right:16px;bottom:150px;width:120px;height:120px;border:1px solid rgba(140,190,255,.4);border-radius:50%;background:rgba(8,14,24,.5);z-index:6;pointer-events:none;display:none;}
+  #radar::before,#radar::after{content:"";position:absolute;left:50%;top:50%;background:rgba(140,190,255,.18);}
+  #radar::before{width:1px;height:100%;transform:translateX(-50%);}
+  #radar::after{width:100%;height:1px;transform:translateY(-50%);}
+  .radar-dot{position:absolute;width:7px;height:7px;border-radius:50%;background:#ff5e5e;opacity:0;transform:translate(-50%,-50%);box-shadow:0 0 4px rgba(255,95,95,.8);}
+  #btn-turret{left:236px;bottom:170px;width:60px;height:60px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -162,6 +170,7 @@
 <div id="hitmark"></div>
 <div id="vignette"></div>
 <div id="wave-banner">第 1 波</div>
+<div id="radar"><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div><div class="radar-dot"></div></div>
 
 <div id="start-overlay" class="overlay">
   <div class="card">
@@ -179,7 +188,9 @@
       <button class="hero-btn" data-hero="tank">重装兵</button>
       <button class="hero-btn" data-hero="scout">侦察兵</button>
       <button class="hero-btn" data-hero="medic">医疗兵</button>
+      <button class="hero-btn" data-hero="engineer">工程兵</button>
     </div>
+    <div id="hero-desc" class="hero-desc">加成：均衡</div>
     <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
     <div class="menu-actions">
       <button id="start-btn">进 入 战 斗</button>
@@ -225,6 +236,7 @@
   <button class="tbtn" id="btn-heal">医疗</button>
   <button class="tbtn" id="btn-shop">商店</button>
   <button class="tbtn" id="btn-jump">跳跃</button>
+  <button class="tbtn" id="btn-turret">炮台</button>
 </div>
 
 <div id="shop-overlay" class="overlay hidden">
