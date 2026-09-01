@@ -466,6 +466,7 @@
   const heroLevels = { assault:0, tank:0, scout:0, medic:0, engineer:0, ninja:0 };
   let tempWeapon = null, tempT = 0, tempHeat = 0;
   let overheat = false, coolT = 0, reloadT = 0;
+  let gatlingFireT = 0;
   let mines = 0;
   const clones = [];
 
@@ -1189,7 +1190,7 @@
   }
   function collectEquip(type) {
     if (type === 'mine') { mines += 2; showBanner('+2 地雷（X 放置）'); playSound('pickup'); }
-    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : 35); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; if (type === 'saber') { invincT = (hero === 'ninja' ? 20 : 10); showBanner('光剑·无敌 ' + invincT + ' 秒！'); } else { showBanner('装备：' + TEMP_WEAPONS[type].name); } playSound('pickup'); applyView(); updateHudAmmo(); }
+    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : (type === 'gatling' ? 60 : 35)); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; gatlingFireT = 0; if (type === 'saber') { invincT = (hero === 'ninja' ? 20 : 10); showBanner('光剑·无敌 ' + invincT + ' 秒！'); } else { showBanner('装备：' + TEMP_WEAPONS[type].name); } playSound('pickup'); applyView(); updateHudAmmo(); }
   }
   function placeMine() {
     if (!gameStarted || !player.alive || !running) return;
@@ -1323,11 +1324,9 @@
     if (!player.alive || switchTimer > 0) return;
     if (timeNow - lastShotAt < cfg.interval) return;
     if (tempWeapon === 'gatling') {
-      if (overheat || reloadT > 0) return;
+      if (overheat || coolT > 0) return;
       lastShotAt = timeNow;
       fireOneBullet(cfg);
-      tempHeat += 4;
-      if (tempHeat >= (cfg.heatMax || 100)) { overheat = true; coolT = cfg.cool || 3; }
     } else if (tempWeapon === 'flame') { lastShotAt = timeNow; fireFlame(cfg); }
     else if (tempWeapon === 'laser') { lastShotAt = timeNow; fireLaser(cfg); }
     else if (tempWeapon === 'saber') { lastShotAt = timeNow; fireSaber(cfg); }
@@ -1593,7 +1592,7 @@
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
     lastHurtTime = -99; turretCooldown = 0; skillCd = 0; buffT = 0; dmgBuff = 1; spdBuff = 1;
-    tempWeapon = null; tempT = 0; tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; mines = 0;
+    tempWeapon = null; tempT = 0; tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; gatlingFireT = 0; mines = 0;
     equips.forEach(function (e) { scene.remove(e.mesh); }); equips.length = 0;
     minesArray.forEach(function (m) { scene.remove(m.mesh); }); minesArray.length = 0;
     clones.forEach(function (c) { scene.remove(c.group); }); clones.length = 0;
@@ -2156,8 +2155,8 @@
       tempT -= dt;
       if (tempT <= 0) { tempWeapon = null; applyView(); updateHudAmmo(); }
       if (tempWeapon === 'gatling') {
-        if (overheat) { coolT -= dt; if (coolT <= 0) { reloadT = 3 + Math.random() * 2; overheat = false; } }
-        else if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) tempHeat = 0; }
+        if (overheat) { coolT -= dt; if (coolT <= 0) overheat = false; }
+        else if (firing) { gatlingFireT += dt; if (gatlingFireT >= 20) { overheat = true; coolT = 5; gatlingFireT = 0; } }
       }
     }
 
