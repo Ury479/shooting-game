@@ -932,7 +932,8 @@
         const to = nearest.group.position.clone().add(new THREE.Vector3(0, 1, 0));
         spawnTracer(from, to);
         spawnFlash(from);
-        nearest.takeDamage(Math.round(12 * (1 + (worldWave() - 1) * 0.20)), null);
+        const eLv = (hero === 'engineer' ? (heroLevels.engineer || 0) : 0);
+        nearest.takeDamage(Math.round(12 * (1 + (worldWave() - 1) * 0.20) * (1 + eLv * 0.25)), null);
         burstSparks(to, 0xffc46b, 3);
       }
     }
@@ -2175,8 +2176,9 @@
     if (moveDir.lengthSq() > 0) moveDir.normalize();
 
     const canSprint = sprinting && f > 0 && player.stamina > 0;
-    let speed = heroStats().speed * spdBuff;
-    if (canSprint) { speed = heroStats().speed * spdBuff * 1.65; player.stamina = Math.max(0, player.stamina - 22 * dt); }
+    const spdMul = spdBuff * (invincT > 0 ? 1.4 : 1);
+    let speed = heroStats().speed * spdMul;
+    if (canSprint) { speed = heroStats().speed * spdMul * 1.65; player.stamina = Math.max(0, player.stamina - 22 * dt); }
 
     // 加速度 / 摩擦
     const target = moveDir.clone().multiplyScalar(speed);
