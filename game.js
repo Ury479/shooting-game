@@ -1162,6 +1162,13 @@
     if (notice) { const n = document.getElementById('death-note'); if (n) n.textContent = notice; }
     updateMenuUI();
   }
+  function exitToMenu() {
+    if (!gameStarted) return;
+    const earned = Math.max(0, coins - runStartCoins);
+    saveGame();
+    document.exitPointerLock && document.exitPointerLock();
+    showMainMenu('已退出 · 当前第 ' + wave + ' 波 · 本局 +' + earned + ' 金币');
+  }
   function updateMenuUI() {
     const c = document.getElementById('menu-coins'); if (c) c.textContent = coins;
     const mk = document.getElementById('menu-medkits'); if (mk) mk.textContent = medkits;
@@ -1517,6 +1524,8 @@
     ensureAudio();
     resumeGame();
   });
+  const quitBtn = document.getElementById('quit-btn');
+  if (quitBtn) quitBtn.addEventListener('click', function () { exitToMenu(); });
   restartBtn.addEventListener('click', function () {
     ensureAudio();
     startGame();
