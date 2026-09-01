@@ -295,13 +295,13 @@
 
   /* ---------- 武器配置 ---------- */
   const WEAPONS = {
-    pistol: { name:'手枪', key:1, auto:false, damage:26, interval:0.22, spread:0.012, pellets:1, mag:12, reserve:48, reload:0.9, recoil:0.16, kick:0.6, color:0xd9d9d9, price:0 },
-    smg:    { name:'冲锋枪', key:2, auto:true, damage:10, interval:0.055, spread:0.035, pellets:1, mag:40, reserve:200, reload:1.3, recoil:0.08, kick:0.45, color:0x3a7bd5, price:500 },
-    rifle:  { name:'突击步枪', key:3, auto:true, damage:15, interval:0.085, spread:0.025, pellets:1, mag:30, reserve:120, reload:1.5, recoil:0.1, kick:0.5, color:0x3a8f5f, price:800 },
-    shotgun:{ name:'霰弹枪', key:4, auto:false, damage:11, interval:0.75, spread:0.09, pellets:8, mag:6, reserve:30, reload:2.0, recoil:0.5, kick:1.4, color:0xb06a3a, price:900 },
-    sniper: { name:'狙击步枪', key:5, auto:false, damage:120, interval:1.15, spread:0.002, pellets:1, mag:5, reserve:20, reload:2.2, recoil:0.7, kick:2.2, color:0x5a5a6a, price:1200 },
-    lmg:    { name:'轻机枪', key:6, auto:true, damage:14, interval:0.08, spread:0.05, pellets:1, mag:100, reserve:240, reload:2.6, recoil:0.14, kick:0.6, color:0x8a5a3a, price:1500 },
-    melee:  { name:'军刀', key:7, auto:false, damage:70, interval:0.5, spread:0, pellets:0, mag:1, reserve:1, reload:0, recoil:0, kick:0, color:0xcccccc, price:0, melee:true }
+    pistol: { name:'手枪', key:1, auto:false, damage:26, interval:0.22, spread:0.012, pellets:1, mag:12, reserve:48, reload:0.9, recoil:0.16, kick:0.6, color:0xd9d9d9, price:0, range:60 },
+    smg:    { name:'冲锋枪', key:2, auto:true, damage:10, interval:0.06, spread:0.035, pellets:1, mag:40, reserve:200, reload:1.3, recoil:0.08, kick:0.45, color:0x3a7bd5, price:500, range:45 },
+    rifle:  { name:'突击步枪', key:3, auto:true, damage:16, interval:0.08, spread:0.025, pellets:1, mag:30, reserve:120, reload:1.5, recoil:0.1, kick:0.5, color:0x3a8f5f, price:800, range:80 },
+    shotgun:{ name:'霰弹枪', key:4, auto:false, damage:13, interval:0.75, spread:0.09, pellets:8, mag:6, reserve:30, reload:2.0, recoil:0.5, kick:1.4, color:0xb06a3a, price:900, range:18 },
+    sniper: { name:'狙击步枪', key:5, auto:false, damage:130, interval:1.15, spread:0.002, pellets:1, mag:5, reserve:20, reload:2.2, recoil:0.7, kick:2.2, color:0x5a5a6a, price:1200, range:220 },
+    lmg:    { name:'轻机枪', key:6, auto:true, damage:14, interval:0.05, spread:0.05, pellets:1, mag:100, reserve:240, reload:2.6, recoil:0.14, kick:0.6, color:0x8a5a3a, price:1500, range:70 },
+    melee:  { name:'军刀', key:7, auto:false, damage:100, interval:0.5, spread:0, pellets:0, mag:1, reserve:1, reload:0, recoil:0, kick:0, color:0xcccccc, price:0, melee:true, range:3 }
   };
   const WEAPON_ORDER = ['pistol','smg','rifle','shotgun','sniper','lmg','melee'];
 
@@ -725,7 +725,7 @@
 
   function spawnEnemy(type, pos) {
     let p = pos;
-    if (!p) { const ang = Math.random() * Math.PI * 2; const dist = 24 + Math.random() * 16; p = { x: Math.cos(ang) * dist, z: Math.sin(ang) * dist }; }
+    if (!p || Math.hypot(p.x - player.pos.x, p.z - player.pos.z) < 13) p = randomSpawnPos();
     const e = makeEnemy(type);
     Object.assign(e, enemyProto);
     e.group.position.set(p.x, 0, p.z);
@@ -733,8 +733,8 @@
   }
   function randomSpawnPos() {
     const ang = Math.random() * Math.PI * 2;
-    const dist = 24 + Math.random() * 16;
-    return { x: Math.cos(ang) * dist, z: Math.sin(ang) * dist };
+    const dist = 26 + Math.random() * 14;
+    return { x: player.pos.x + Math.cos(ang) * dist, z: player.pos.z + Math.sin(ang) * dist };
   }
 
   function pickEnemyType() {
@@ -1042,7 +1042,7 @@
   function meleeAttack() {
     lastShotAt = timeNow;
     meleeSwing = 1;
-    const range = 3.0;
+    const range = WEAPONS.melee.range || 3;
     const fwd3 = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     let hitAny = false;
     enemies.forEach(function (e) {
@@ -1119,12 +1119,14 @@
     lastShotAt = timeNow;
     ammo[currentWeapon]--;
 
-    // 计算准星瞄准点（从相机中心射一条线）
+    // 计算准星瞄准点（射程=武器 range）
+    const range = cfg.range || 200;
     const targets = rayTargets();
+    ray.far = range;
     ray.setFromCamera({ x: 0, y: 0 }, camera);
     const aimHits = ray.intersectObjects(targets, false);
     const camDir = camera.getWorldDirection(new THREE.Vector3());
-    const aimPoint = aimHits.length ? aimHits[0].point.clone() : camera.position.clone().addScaledVector(camDir, 90);
+    const aimPoint = aimHits.length ? aimHits[0].point.clone() : camera.position.clone().addScaledVector(camDir, range);
 
     const muzzle = muzzleWorldPos();
 
@@ -1138,7 +1140,7 @@
 
       ray.set(muzzle, dir);
       const hits = ray.intersectObjects(targets, false);
-      let end = muzzle.clone().addScaledVector(dir, 90);
+      let end = muzzle.clone().addScaledVector(dir, range);
       let hitEnemy = null;
       for (let i = 0; i < hits.length; i++) {
         const o = hits[i].object;
@@ -2012,7 +2014,7 @@
       // 射手远程射击
       if (e.cfg.shooter) {
         e.fireCooldown -= dt;
-        if (e.fireCooldown <= 0 && dist < 22 && player.alive) {
+        if (e.fireCooldown <= 0 && dist < 20 && player.alive) {
           e.fireCooldown = 1.6;
           fireEnemyBullet(
             e.group.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
