@@ -458,6 +458,7 @@
   let runStartCoins = 0;
   let lastHurtTime = -99;
   let skillCd = 0, buffT = 0, dmgBuff = 1, spdBuff = 1;
+  let invincT = 0;
   let currentLevel = 0;
   let saveUnlocked = 0;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
@@ -916,7 +917,8 @@
     for (let i = turrets.length - 1; i >= 0; i--) {
       const t = turrets[i];
       t.fireCd -= dt;
-      let nearest = null, nd = TURRET_RANGE;
+      const tRange = (hero === 'engineer' ? 26 : TURRET_RANGE);
+      let nearest = null, nd = tRange;
       enemies.forEach(function (e) {
         if (!e.alive || e.dying) return;
         const d = Math.hypot(e.group.position.x - t.group.position.x, e.group.position.z - t.group.position.z);
@@ -945,7 +947,7 @@
     // 预判刷怪点（青色）
     const spawnDots = radar.querySelectorAll('.radar-dot.spawn');
     let k = 0;
-    spawnQueue.forEach(function (it) {
+    pendingSpawns.forEach(function (it) {
       if (k >= spawnDots.length) return;
       const pos = it.pos || it;
       const dx = pos.x - player.pos.x, dz = pos.z - player.pos.z;
@@ -1132,6 +1134,7 @@
   /* ---------- 地图装备 / 临时武器 / 地雷 / 影分身 ---------- */
   const equips = [];
   const minesArray = [];
+  const pendingSpawns = [];
   function spawnEquip(type, pos) {
     const colors = { gatling:0x9a9a9a, flame:0xff7b00, laser:0x35e0ff, saber:0x00ffcc, mine:0x888888 };
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: colors[type] || 0x888888, roughness: 0.4, metalness: 0.4, emissive: colors[type] || 0x333333, emissiveIntensity: 0.4 }));
@@ -1158,9 +1161,34 @@
       if (dx * dx + dz * dz < 2.5) { collectEquip(eq.type); scene.remove(eq.mesh); equips.splice(i, 1); }
     }
   }
+  function createShadowSpawn(type, pos) {
+    let shadow = null;
+    if (hero === 'scout') {
+      const mat = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.3, roughness: 0.9, depthWrite: false });
+      const g = new THREE.Group();
+      const b1 = box(0.7, 0.8, 0.45, mat); b1.position.y = 1.0; g.add(b1);
+      const b2 = box(0.5, 0.42, 0.42, mat); b2.position.y = 1.72; g.add(b2);
+      g.position.set(pos.x, 0, pos.z);
+      scene.add(g);
+      shadow = g;
+    }
+    pendingSpawns.push({ type: type, pos: pos, t: 5, shadow: shadow });
+  }
+  function updateSpawns(dt) {
+    for (let i = pendingSpawns.length - 1; i >= 0; i--) {
+      const sp = pendingSpawns[i];
+      sp.t -= dt;
+      if (sp.shadow) {
+        const sc = Math.min(1, (5 - sp.t) / 5);
+        sp.shadow.scale.setScalar(0.6 + sc * 0.4);
+        sp.shadow.children.forEach(function (c) { if (c.material) c.material.opacity = 0.2 + 0.3 * Math.abs(Math.sin(timeNow * 6)); });
+      }
+      if (sp.t <= 0) { spawnEnemy(sp.type, sp.pos); if (sp.shadow) scene.remove(sp.shadow); pendingSpawns.splice(i, 1); }
+    }
+  }
   function collectEquip(type) {
     if (type === 'mine') { mines += 2; showBanner('+2 地雷（X 放置）'); playSound('pickup'); }
-    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : 35); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; showBanner('装备：' + TEMP_WEAPONS[type].name); playSound('pickup'); applyView(); updateHudAmmo(); }
+    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : 35); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; if (type === 'saber') { invincT = (hero === 'ninja' ? 20 : 10); showBanner('光剑·无敌 ' + invincT + ' 秒！'); } else { showBanner('装备：' + TEMP_WEAPONS[type].name); } playSound('pickup'); applyView(); updateHudAmmo(); }
   }
   function placeMine() {
     if (!gameStarted || !player.alive || !running) return;
@@ -1236,7 +1264,9 @@
     let end = muzzle.clone().addScaledVector(dir, range), hitEnemy = null;
     for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.isGround || o.userData.isObstacle) { end = hits[i].point; break; } if (o.userData.enemy) { end = hits[i].point; hitEnemy = findEnemyByMesh(o); break; } }
     spawnTracer(muzzle, end);
-    if (hitEnemy) { hitEnemy.takeDamage(cfg.damage * heroStats().dmgMult * dmgBuff, dir); hitmark(0); burstSparks(end, 0xffc46b, 3); }
+    let dmgVal = cfg.damage * heroStats().dmgMult * dmgBuff;
+    if (hero === 'engineer' && tempWeapon === 'gatling') dmgVal *= 1.5;
+    if (hitEnemy) { hitEnemy.takeDamage(dmgVal, dir); hitmark(0); burstSparks(end, 0xffc46b, 3); }
     else burstSparks(end, 0x9fb4d8, 2);
     spawnFlash(muzzle);
     recoilZ += cfg.recoil * 0.4; recoilPitch += cfg.recoil * 0.7; shake += cfg.kick * 0.3;
@@ -1458,6 +1488,7 @@
   /* ---------- 受击 ---------- */
   function damagePlayer(dmg) {
     if (!player.alive) return;
+    if (invincT > 0) return;
     dmg = Math.max(1, Math.round(dmg * heroStats().resMult));
     if (player.shield > 0) {
       const absorb = Math.min(player.shield, dmg);
@@ -1565,6 +1596,7 @@
     equips.forEach(function (e) { scene.remove(e.mesh); }); equips.length = 0;
     minesArray.forEach(function (m) { scene.remove(m.mesh); }); minesArray.length = 0;
     clones.forEach(function (c) { scene.remove(c.group); }); clones.length = 0;
+    pendingSpawns.forEach(function (sp) { if (sp.shadow) scene.remove(sp.shadow); }); pendingSpawns.length = 0;
     turrets.forEach(function (t) { scene.remove(t.group); });
     turrets.length = 0;
     currentWeapon = 'pistol';
@@ -2094,6 +2126,7 @@
       updateEquips(dt);
       updateMines();
       updateClones(dt);
+      updateSpawns(dt);
     }
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
@@ -2117,6 +2150,7 @@
     if (buffT <= 0) { dmgBuff = 1; spdBuff = 1; }
     if (skillCd > 0) skillCd -= dt;
     if (turretCooldown > 0) turretCooldown -= dt;
+    if (invincT > 0) invincT -= dt;
     if (tempWeapon) {
       tempT -= dt;
       if (tempT <= 0) { tempWeapon = null; applyView(); updateHudAmmo(); }
@@ -2407,12 +2441,12 @@
       spawnTimer -= dt;
       if (spawnTimer <= 0 && spawnQueue.length > 0) {
         const it = spawnQueue.shift();
-        spawnEnemy(it.type, it.pos);
+        createShadowSpawn(it.type, it.pos);
         spawnTimer = Math.max(0.18, 1.0 - wave * 0.06);
       }
       if (spawnQueue.length === 0) waveState = 'fighting';
     } else if (waveState === 'fighting') {
-      if (enemies.length === 0) {
+      if (enemies.length === 0 && pendingSpawns.length === 0) {
         waveState = 'cleared';
         waveDelay = (mode === 'endless' ? 10 : 2.2);
         showBanner(mode === 'endless' ? '10 秒后刷新下一波…' : '波次肃清！');
