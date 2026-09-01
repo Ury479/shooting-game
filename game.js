@@ -14,12 +14,12 @@
 
   /* ---------- 难度 / 平衡 ---------- */
   const DIFF = {
-    hpPerWave: 0.38,        // 每波敌人血量增幅
-    dmgPerWave: 0.15,       // 每波敌人伤害增幅
+    hpPerWave: 0.22,        // 每波敌人血量增幅（放缓）
+    dmgPerWave: 0.06,       // 每波敌人伤害增幅（大幅放缓）
     speedPerWave: 0.04,     // 每波敌人移速增幅
     speedCap: 0.6,
-    baseCount: 7,           // 首波敌人数量
-    countPerWave: 3,        // 每波新增数量
+    baseCount: 6,           // 首波敌人数量
+    countPerWave: 2,        // 每波新增数量（降低压迫感）
     healAmount: 40,         // 医疗包回复量
     medkitCap: 3,           // 医疗包持有上限
     medkitPrice: 200,       // 医疗包价格
@@ -434,8 +434,8 @@
     maxStamina: 100,
     vy: 0,
     onGround: true,
-    shield: 50,
-    maxShield: 50,
+    shield: 60,
+    maxShield: 60,
     alive: true
   };
   const keys = {};
@@ -551,8 +551,8 @@
     const h = HEROES[hero];
     player.maxHp = h.hp;
     player.maxStamina = h.stamina;
-    player.maxShield = 50;
-    player.shield = 50;
+    player.maxShield = 60;
+    player.shield = 60;
     MAT.body.color.setHex(h.color);
     MAT.bodyDark.color.setHex(h.dark);
     const hd = document.getElementById('hero-desc');
@@ -717,7 +717,7 @@
     runner:   { hp: 28, speed: 7.2, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者', coin: 70 },
     brute:    { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵', coin: 150 },
     shooter:  { hp: 50, speed: 2.2, damage: 12, scale: 0.9, color: 0x2ecc71, score: 200, name: '射手(绿)', coin: 200, shooter: true },
-    exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 35, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', coin: 90, exploder: true },
+    exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 28, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', coin: 90, exploder: true },
     flyer:    { hp: 70, speed: 4.6, damage: 10, scale: 0.8, color: 0x3498db, score: 220, name: '飞行兵', coin: 120, flyer: true },
     boss:     { hp: 700, speed: 0.9, damage: 70, scale: 3.2, color: 0x1a1a22, score: 800, name: '巨型Boss', coin: 1000, boss: true }
   };
@@ -771,12 +771,12 @@
     grp.traverse(function (o) { if (o.isMesh && o.geometry) meshes.push(o); });
 
     const wv = worldWave();
-    const waveScale = 1 + (wv - 1) * DIFF.hpPerWave;
+    const waveScale = Math.min(4.0, 1 + (wv - 1) * DIFF.hpPerWave);
     return {
       type, cfg, group: grp, meshes, bodyMesh: body,
       hp: cfg.hp * waveScale,
       maxHp: cfg.hp * waveScale,
-      dmgScale: 1 + (wv - 1) * DIFF.dmgPerWave,
+      dmgScale: Math.min(1.8, 1 + (wv - 1) * DIFF.dmgPerWave),
       spdScale: 1 + Math.min(DIFF.speedCap, (wv - 1) * DIFF.speedPerWave),
       walkPhase: Math.random() * Math.PI * 2,
       hitCooldown: 0,
@@ -1366,7 +1366,7 @@
     e.hbBack.visible = false; e.hbFront.visible = false;
     const dx = player.pos.x - e.group.position.x;
     const dz = player.pos.z - e.group.position.z;
-    if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(e.cfg.explosion * e.dmgScale);
+    if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(e.cfg.explosion);
     burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
     shake += 0.9;
     playSound('explode');
@@ -2426,7 +2426,7 @@
       if (this.cfg.exploder) {
         const ex = this.group.position;
         const dx = player.pos.x - ex.x, dz = player.pos.z - ex.z;
-        if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(this.cfg.explosion * this.dmgScale);
+        if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(this.cfg.explosion);
         burstSparks(this.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
         playSound('explode');
       }
