@@ -647,12 +647,12 @@
   const enemies = [];
   const ENEMY_TYPES = {
     walker:   { hp: 60, speed: 3.2, damage: 12, scale: 1.0, color: 0xe74c3c, score: 100, name: '突击兵', coin: 50 },
-    runner:   { hp: 34, speed: 6.4, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者', coin: 70 },
+    runner:   { hp: 28, speed: 7.2, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者', coin: 70 },
     brute:    { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵', coin: 150 },
     shooter:  { hp: 50, speed: 2.2, damage: 12, scale: 0.9, color: 0x2ecc71, score: 200, name: '射手(绿)', coin: 200, shooter: true },
     exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 35, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', coin: 90, exploder: true },
     flyer:    { hp: 70, speed: 4.6, damage: 10, scale: 0.8, color: 0x3498db, score: 220, name: '飞行兵', coin: 120, flyer: true },
-    boss:     { hp: 700, speed: 1.2, damage: 55, scale: 2.6, color: 0x1a1a22, score: 800, name: '巨型Boss', coin: 1000, boss: true }
+    boss:     { hp: 700, speed: 0.9, damage: 70, scale: 3.2, color: 0x1a1a22, score: 800, name: '巨型Boss', coin: 1000, boss: true }
   };
 
   function makeEnemy(type) {
@@ -714,7 +714,7 @@
       walkPhase: Math.random() * Math.PI * 2,
       hitCooldown: 0,
       attackCooldown: Math.random() * 0.5,
-      fireCooldown: 1.5,
+      fireCooldown: 2.4,
       exploded: false,
       alive: true,
       legPivots, armPivots, hbBack, hbFront,
@@ -2015,7 +2015,7 @@
       if (e.cfg.shooter) {
         e.fireCooldown -= dt;
         if (e.fireCooldown <= 0 && dist < 20 && player.alive) {
-          e.fireCooldown = 1.6;
+          e.fireCooldown = 2.4;
           fireEnemyBullet(
             e.group.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
             new THREE.Vector3(player.pos.x, player.pos.y + 1.05, player.pos.z),
