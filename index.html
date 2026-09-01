@@ -101,6 +101,15 @@
   .view-btn{padding:10px 22px;font-size:15px;font-weight:700;border-radius:10px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.06);color:#cfe0f5;cursor:pointer;letter-spacing:2px;}
   .view-btn.active{background:linear-gradient(90deg,#35e0ff,#7fffd4);color:#04121a;border-color:transparent;}
   .view-note{color:#8fa7cc;font-size:12px;letter-spacing:1px;margin-top:12px;}
+  .hero-row{display:flex;gap:8px;justify-content:center;margin:4px 0 16px;flex-wrap:wrap;}
+  .hero-btn{padding:8px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.06);color:#cfe0f5;cursor:pointer;}
+  .hero-btn.active{background:linear-gradient(90deg,#35e0ff,#7fffd4);color:#04121a;border-color:transparent;}
+  .shop-item{display:flex;justify-content:space-between;align-items:center;padding:9px 4px;border-bottom:1px dashed rgba(140,190,255,.18);font-size:14px;gap:10px;}
+  .shop-btn{padding:7px 14px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.08);color:#eaf2ff;cursor:pointer;}
+  .shop-btn:hover{background:rgba(53,224,255,.25);}
+  .shop-btn:disabled{opacity:.5;cursor:default;}
+  #btn-heal{left:26px;bottom:170px;width:60px;height:60px;font-size:13px;}
+  #btn-shop{left:96px;bottom:170px;width:60px;height:60px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -118,6 +127,7 @@
     <div class="label">得分</div>
     <div id="score" class="value">0</div>
     <div class="label" style="margin-top:6px;">波次 <span id="wave" class="big">1</span> · 击杀 <span id="kills" class="big">0</span></div>
+    <div class="label" style="margin-top:6px;">金币 <span id="coins" class="big">0</span> · 医疗包 <span id="medkits" class="big">0</span></div>
   </div>
 
   <div id="bottom-center" class="panel">
@@ -154,6 +164,13 @@
       <div><span>暂停</span><span class="k">Esc</span></div>
     </div>
     <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
+    <div class="sub">选择英雄</div>
+    <div class="hero-row" id="hero-row">
+      <button class="hero-btn active" data-hero="assault">突击手</button>
+      <button class="hero-btn" data-hero="tank">重装兵</button>
+      <button class="hero-btn" data-hero="scout">侦察兵</button>
+      <button class="hero-btn" data-hero="medic">医疗兵</button>
+    </div>
     <button id="start-btn">开 始 游 戏</button>
     <div class="view-note">默认第一人称 · 暂停菜单可切换第三人称</div>
   </div>
@@ -189,6 +206,22 @@
   <button class="tbtn" id="btn-dodge">翻滚</button>
   <button class="tbtn" id="btn-sprint">冲刺</button>
   <button class="tbtn" id="btn-pause">暂停</button>
+  <button class="tbtn" id="btn-heal">医疗</button>
+  <button class="tbtn" id="btn-shop">商店</button>
+</div>
+
+<div id="shop-overlay" class="overlay hidden">
+  <div class="card" style="text-align:left;max-height:84vh;overflow:auto;">
+    <h1 style="font-size:26px;text-align:center;">商 店</h1>
+    <div class="sub" style="text-align:center;">金币 <span id="shop-coins">0</span> · 医疗包 <span id="shop-medkits">0</span></div>
+    <div class="shop-item"><span>冲锋枪 · 高射速</span><button id="buy-smg" class="shop-btn">购买 500 金币</button></div>
+    <div class="shop-item"><span>突击步枪 · 均衡</span><button id="buy-rifle" class="shop-btn">购买 800 金币</button></div>
+    <div class="shop-item"><span>霰弹枪 · 近距离</span><button id="buy-shotgun" class="shop-btn">购买 900 金币</button></div>
+    <div class="shop-item"><span>狙击步枪 · 高伤</span><button id="buy-sniper" class="shop-btn">购买 1200 金币</button></div>
+    <div class="shop-item"><span>轻机枪 · 大弹匣</span><button id="buy-lmg" class="shop-btn">购买 1500 金币</button></div>
+    <div class="shop-item"><span>医疗包 · 回血</span><button id="buy-medkit" class="shop-btn">医疗包 150 金币</button></div>
+    <button id="shop-close" class="shop-btn" style="width:100%;margin-top:10px;">关 闭</button>
+  </div>
 </div>
 
 <script src="vendor/three.min.js"></script>

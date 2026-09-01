@@ -280,20 +280,15 @@
 
   /* ---------- 武器配置 ---------- */
   const WEAPONS = {
-    pistol: {
-      name: '手枪', key: 1, auto: false, damage: 26, interval: 0.22, spread: 0.012,
-      pellets: 1, mag: 12, reserve: 60, reload: 0.9, recoil: 0.16, kick: 0.6, color: 0xd9d9d9
-    },
-    rifle: {
-      name: '突击步枪', key: 2, auto: true, damage: 15, interval: 0.085, spread: 0.025,
-      pellets: 1, mag: 30, reserve: 150, reload: 1.5, recoil: 0.1, kick: 0.5, color: 0x3a8f5f
-    },
-    shotgun: {
-      name: '霰弹枪', key: 3, auto: false, damage: 11, interval: 0.75, spread: 0.09,
-      pellets: 8, mag: 6, reserve: 36, reload: 2.0, recoil: 0.5, kick: 1.4, color: 0xb06a3a
-    }
+    pistol: { name:'手枪', key:1, auto:false, damage:26, interval:0.22, spread:0.012, pellets:1, mag:12, reserve:60, reload:0.9, recoil:0.16, kick:0.6, color:0xd9d9d9, price:0 },
+    smg:    { name:'冲锋枪', key:2, auto:true, damage:10, interval:0.055, spread:0.035, pellets:1, mag:40, reserve:240, reload:1.3, recoil:0.08, kick:0.45, color:0x3a7bd5, price:500 },
+    rifle:  { name:'突击步枪', key:3, auto:true, damage:15, interval:0.085, spread:0.025, pellets:1, mag:30, reserve:150, reload:1.5, recoil:0.1, kick:0.5, color:0x3a8f5f, price:800 },
+    shotgun:{ name:'霰弹枪', key:4, auto:false, damage:11, interval:0.75, spread:0.09, pellets:8, mag:6, reserve:36, reload:2.0, recoil:0.5, kick:1.4, color:0xb06a3a, price:900 },
+    sniper: { name:'狙击步枪', key:5, auto:false, damage:120, interval:1.15, spread:0.002, pellets:1, mag:5, reserve:25, reload:2.2, recoil:0.7, kick:2.2, color:0x5a5a6a, price:1200 },
+    lmg:    { name:'轻机枪', key:6, auto:true, damage:14, interval:0.08, spread:0.05, pellets:1, mag:100, reserve:300, reload:2.6, recoil:0.14, kick:0.6, color:0x8a5a3a, price:1500 },
+    melee:  { name:'军刀', key:7, auto:false, damage:70, interval:0.5, spread:0, pellets:0, mag:1, reserve:1, reload:0, recoil:0, kick:0, color:0xcccccc, price:0, melee:true }
   };
-  const WEAPON_ORDER = ['pistol', 'rifle', 'shotgun'];
+  const WEAPON_ORDER = ['pistol','smg','rifle','shotgun','sniper','lmg','melee'];
 
   /* ---------- 武器模型 ---------- */
   function box(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); }
@@ -316,6 +311,14 @@
       const grip = box(0.085, 0.2, 0.11, accent); grip.position.set(0, -0.13, -0.06); grip.rotation.x = 0.25; g.add(grip);
       muzzle.position.set(0, 0.09, 0.32);
       eject.position.set(0.05, 0.1, 0.02);
+    } else if (type === 'smg') {
+      g.add(box(0.09, 0.13, 0.55, MAT.dark));
+      const barrel = cyl(0.02, 0.3, MAT.metal); barrel.position.set(0, 0.03, 0.42); g.add(barrel);
+      const stock = box(0.07, 0.1, 0.2, MAT.dark); stock.position.set(0, -0.01, -0.35); g.add(stock);
+      const mag = box(0.05, 0.22, 0.09, accent); mag.position.set(0, -0.16, 0.03); mag.rotation.x = 0.15; g.add(mag);
+      const grip = box(0.06, 0.13, 0.08, accent); grip.position.set(0, -0.12, -0.2); g.add(grip);
+      muzzle.position.set(0, 0.03, 0.6);
+      eject.position.set(0.06, 0.08, 0.04);
     } else if (type === 'rifle') {
       g.add(box(0.09, 0.13, 0.6, MAT.dark));
       const barrel = cyl(0.024, 0.42, MAT.metal); barrel.position.set(0, 0.03, 0.5); g.add(barrel);
@@ -326,7 +329,7 @@
       const tip = box(0.05, 0.05, 0.08, MAT.metal); tip.position.set(0, 0.03, 0.7); g.add(tip);
       muzzle.position.set(0, 0.03, 0.76);
       eject.position.set(0.06, 0.08, 0.05);
-    } else {
+    } else if (type === 'shotgun') {
       const barrel = cyl(0.034, 0.5, MAT.metal); barrel.position.set(0, 0.02, 0.28); g.add(barrel);
       const recv = box(0.09, 0.12, 0.32, MAT.dark); recv.position.set(0, 0, 0.06); g.add(recv);
       const pump = box(0.1, 0.09, 0.16, accent); pump.position.set(0, -0.02, 0.3); g.add(pump);
@@ -334,6 +337,29 @@
       const tube = cyl(0.03, 0.3, MAT.metal); tube.position.set(0, -0.06, 0.26); g.add(tube);
       muzzle.position.set(0, 0.02, 0.58);
       eject.position.set(0.06, 0.08, -0.04);
+    } else if (type === 'sniper') {
+      g.add(box(0.08, 0.13, 0.7, MAT.dark));
+      const barrel = cyl(0.022, 0.55, MAT.metal); barrel.position.set(0, 0.04, 0.55); g.add(barrel);
+      const stock = box(0.08, 0.12, 0.26, MAT.dark); stock.position.set(0, -0.02, -0.45); g.add(stock);
+      const mag = box(0.05, 0.18, 0.08, accent); mag.position.set(0, -0.15, 0.05); g.add(mag);
+      const scope = cyl(0.045, 0.26, MAT.metal); scope.position.set(0, 0.16, 0.08); g.add(scope);
+      muzzle.position.set(0, 0.04, 0.86);
+      eject.position.set(0.06, 0.09, 0.1);
+    } else if (type === 'lmg') {
+      g.add(box(0.11, 0.15, 0.7, MAT.dark));
+      const barrel = cyl(0.03, 0.5, MAT.metal); barrel.position.set(0, 0.03, 0.58); g.add(barrel);
+      const boxMag = box(0.12, 0.2, 0.22, accent); boxMag.position.set(0, -0.18, 0.02); g.add(boxMag);
+      const stock = box(0.08, 0.13, 0.24, MAT.dark); stock.position.set(0, -0.02, -0.46); g.add(stock);
+      const handle = box(0.05, 0.12, 0.1, accent); handle.position.set(0, 0.12, -0.05); g.add(handle);
+      muzzle.position.set(0, 0.03, 0.84);
+      eject.position.set(0.08, 0.09, 0.06);
+    } else if (type === 'melee') {
+      const blade = box(0.05, 0.05, 0.34, MAT.metal); blade.position.set(0, 0.03, 0.22); g.add(blade);
+      const tip = box(0.05, 0.05, 0.08, accent); tip.position.set(0, 0.03, 0.4); g.add(tip);
+      const guard = box(0.14, 0.04, 0.04, accent); guard.position.set(0, 0, 0.03); g.add(guard);
+      const handle = box(0.05, 0.05, 0.16, MAT.dark); handle.position.set(0, -0.01, -0.12); g.add(handle);
+      muzzle.position.set(0, 0.03, 0.44);
+      eject.position.set(0, 0.03, 0.05);
     }
     muzzle.name = 'muzzle';
     eject.name = 'eject';
@@ -350,11 +376,34 @@
     pitch: 0,
     vel: new THREE.Vector3(),
     hp: 100,
+    maxHp: 100,
     stamina: 100,
+    maxStamina: 100,
     alive: true
   };
   const keys = {};
   let firing = false;
+
+  /* ---------- 英雄 / 货币 / 装备 ---------- */
+  const HEROES = {
+    assault: { name:'突击手', hp:100, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1 },
+    tank:    { name:'重装兵', hp:160, speed:4.4, stamina:130, color:0xb0563a, dark:0x7a3a26, healMult:1 },
+    scout:   { name:'侦察兵', hp:80, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1 },
+    medic:   { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5 }
+  };
+  let hero = 'assault';
+  let coins = 0;
+  let medkits = 0;
+  let meleeSwing = 0;
+  const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
+  function heroStats() { return HEROES[hero]; }
+  function applyHero() {
+    const h = HEROES[hero];
+    player.maxHp = h.hp;
+    player.maxStamina = h.stamina;
+    MAT.body.color.setHex(h.color);
+    MAT.bodyDark.color.setHex(h.dark);
+  }
 
   /* ---------- 设备 / 输入适配 ---------- */
   // 触屏检测：只在「粗指针/无悬停」的真触屏设备启用触屏，避免 Mac 触控板被误判
@@ -444,12 +493,12 @@
     fpsGuns[type] = g;
   });
 
-  let currentWeapon = 'rifle';
+  let currentWeapon = 'pistol';
   let reloading = false;
   let reloadTimer = 0;
   let switchTimer = 0;
-  const ammo = { pistol: 12, rifle: 30, shotgun: 6 };
-  const reserve = { pistol: 60, rifle: 150, shotgun: 36 };
+  const ammo = { pistol: 12, smg: 40, rifle: 30, shotgun: 6, sniper: 5, lmg: 100, melee: 1 };
+  const reserve = { pistol: 60, smg: 240, rifle: 150, shotgun: 36, sniper: 25, lmg: 300, melee: 1 };
   let lastShotAt = -10;
   let viewMode = 'fps';
 
@@ -475,6 +524,7 @@
   function currentCfg() { return WEAPONS[currentWeapon]; }
 
   function switchWeapon(type) {
+    if (!owned[type]) { showBanner('未拥有，请在商店购买'); return; }
     if (type === currentWeapon || switchTimer > 0) return;
     currentWeapon = type;
     reloading = false;
@@ -485,8 +535,10 @@
     playSound('switch');
   }
   function cycleWeapon(dir) {
-    const idx = WEAPON_ORDER.indexOf(currentWeapon);
-    const next = WEAPON_ORDER[(idx + dir + WEAPON_ORDER.length) % WEAPON_ORDER.length];
+    const ownedList = WEAPON_ORDER.filter(function (t) { return owned[t]; });
+    let idx = ownedList.indexOf(currentWeapon);
+    if (idx < 0) idx = 0;
+    const next = ownedList[(idx + dir + ownedList.length) % ownedList.length];
     switchWeapon(next);
   }
 
@@ -567,6 +619,61 @@
     if (wave >= 3 && r < 0.16) return 'brute';
     if (wave >= 2 && r < 0.42) return 'runner';
     return 'walker';
+  }
+
+  /* ---------- 掉落物（金币 / 医疗包 / 弹药） ---------- */
+  const pickups = [];
+  function spawnPickup(pos, type) {
+    let mesh;
+    if (type === 'coin') {
+      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 16), new THREE.MeshStandardMaterial({ color:0xffd166, roughness:0.3, metalness:0.6, emissive:0x553800, emissiveIntensity:0.4 }));
+    } else if (type === 'medkit') {
+      const grp = new THREE.Group();
+      grp.add(box(0.42, 0.3, 0.42, new THREE.MeshStandardMaterial({ color:0xf2f2f2, roughness:0.5 })));
+      grp.add(box(0.2, 0.06, 0.44, new THREE.MeshStandardMaterial({ color:0xff4d5e, roughness:0.4 })));
+      grp.add(box(0.06, 0.2, 0.44, new THREE.MeshStandardMaterial({ color:0xff4d5e, roughness:0.4 })));
+      mesh = grp;
+    } else {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.26, 0.34), new THREE.MeshStandardMaterial({ color:0x6dff8a, roughness:0.4, metalness:0.2, emissive:0x0a3015, emissiveIntensity:0.5 }));
+    }
+    mesh.position.copy(pos).add(new THREE.Vector3(0, 0.5, 0));
+    mesh.castShadow = true;
+    scene.add(mesh);
+    pickups.push({ mesh: mesh, type: type, t: Math.random() * 6 });
+  }
+  function dropLoot(pos, type) {
+    let t = type;
+    if (!t) {
+      const r = Math.random();
+      if (r < 0.5) t = 'coin';
+      else if (r < 0.68) t = 'ammo';
+      else if (r < 0.82) t = 'medkit';
+      else t = null;
+    }
+    if (t) spawnPickup(pos, t);
+  }
+  function updatePickups(dt) {
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      const p = pickups[i];
+      p.t += dt;
+      p.mesh.position.y = 0.5 + Math.sin(p.t * 3) * 0.12;
+      p.mesh.rotation.y += dt * 2.5;
+      const dx = player.pos.x - p.mesh.position.x;
+      const dz = player.pos.z - p.mesh.position.z;
+      if (dx * dx + dz * dz < 2.3) {
+        collectPickup(p.type);
+        scene.remove(p.mesh);
+        pickups.splice(i, 1);
+      }
+    }
+  }
+  function collectPickup(type) {
+    if (type === 'coin') { coins += 50; showBanner('+50 金币'); }
+    else if (type === 'medkit') { medkits = Math.min(5, medkits + 1); showBanner('获得医疗包'); }
+    else { WEAPON_ORDER.forEach(function (t) { if (owned[t]) reserve[t] = Math.min(999, reserve[t] + WEAPONS[t].mag); }); showBanner('弹药补充'); }
+    playSound('pickup');
+    updateHud();
+    updateShopUI();
   }
 
   /* ---------- 波次 ---------- */
@@ -655,6 +762,18 @@
       blip(160, 0.2, 0.5, 'sawtooth', -60);
     } else if (kind === 'empty') {
       blip(220, 0.04, 0.2, 'square');
+    } else if (kind === 'melee') {
+      blip(300, 0.08, 0.3, 'square', -200);
+    } else if (kind === 'meleeHit') {
+      blip(140, 0.12, 0.5, 'square', -60); blip(900, 0.05, 0.3, 'triangle');
+    } else if (kind === 'pickup') {
+      blip(660, 0.06, 0.25, 'triangle', 200); blip(990, 0.08, 0.25, 'triangle', 200);
+    } else if (kind === 'buy') {
+      blip(520, 0.06, 0.3, 'square', 200); blip(780, 0.08, 0.3, 'square', 200);
+    } else if (kind === 'heal') {
+      blip(500, 0.12, 0.3, 'sine', 300);
+    } else if (kind === 'noMoney') {
+      blip(180, 0.12, 0.3, 'square', -60);
     }
   }
 
@@ -679,10 +798,34 @@
     return v;
   }
 
+  function meleeAttack() {
+    lastShotAt = timeNow;
+    meleeSwing = 1;
+    const range = 3.0;
+    const fwd3 = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    let hitAny = false;
+    enemies.forEach(function (e) {
+      if (!e.alive || e.dying) return;
+      const dx = e.group.position.x - player.pos.x;
+      const dz = e.group.position.z - player.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < range + e.cfg.scale) {
+        const toE = new THREE.Vector3(dx, 0, dz).normalize();
+        if (fwd3.angleTo(toE) < 1.0) {
+          e.takeDamage(WEAPONS.melee.damage, toE);
+          burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xffe6a0, 6);
+          hitAny = true;
+        }
+      }
+    });
+    if (hitAny) { hitmark(0); playSound('meleeHit'); } else { playSound('melee'); }
+  }
+
   function tryFire() {
     const cfg = currentCfg();
     if (!player.alive || reloading || switchTimer > 0) return;
     if (timeNow - lastShotAt < cfg.interval) return;
+    if (currentWeapon === 'melee') { meleeAttack(); return; }
     if (ammo[currentWeapon] <= 0) {
       playSound('empty');
       startReload();
@@ -821,14 +964,22 @@
   function updateHudAmmo() {
     const cfg = currentCfg();
     weaponNameEl.textContent = cfg.name;
-    ammoEl.innerHTML = ammo[currentWeapon] + ' <small>/ ' + reserve[currentWeapon] + '</small>';
+    if (cfg.melee) {
+      ammoEl.innerHTML = '∞ <small>近战</small>';
+    } else {
+      ammoEl.innerHTML = ammo[currentWeapon] + ' <small>/ ' + reserve[currentWeapon] + '</small>';
+    }
   }
   function updateHud() {
-    hpBar.style.width = Math.max(0, player.hp) + '%';
-    stBar.style.width = Math.max(0, player.stamina) + '%';
+    hpBar.style.width = Math.max(0, Math.round(player.hp / player.maxHp * 100)) + '%';
+    stBar.style.width = Math.max(0, Math.round(player.stamina / player.maxStamina * 100)) + '%';
     scoreEl.textContent = score;
     waveEl.textContent = Math.max(1, wave);
     killsEl.textContent = kills;
+    const coinEl = document.getElementById('coins');
+    if (coinEl) coinEl.textContent = coins;
+    const medEl = document.getElementById('medkits');
+    if (medEl) medEl.textContent = medkits;
   }
 
   /* ---------- 游戏状态 ---------- */
@@ -838,17 +989,22 @@
 
   function startGame() {
     score = 0; kills = 0;
-    player.hp = 100; player.stamina = 100; player.alive = true;
+    applyHero();
+    player.hp = player.maxHp; player.stamina = player.maxStamina; player.alive = true;
     player.pos.set(0, 0, 0); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
     enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); });
     enemies.length = 0;
-    ammo.pistol = 12; ammo.rifle = 30; ammo.shotgun = 6;
-    reserve.pistol = 60; reserve.rifle = 150; reserve.shotgun = 36;
+    WEAPON_ORDER.forEach(function (t) { ammo[t] = WEAPONS[t].mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0;
+    coins = 0; medkits = 0; meleeSwing = 0;
+    owned.pistol = true; owned.smg = false; owned.rifle = false; owned.shotgun = false; owned.sniper = false; owned.lmg = false; owned.melee = true;
+    currentWeapon = 'pistol';
+    applyView();
     startWave(1);
     updateHudAmmo();
     updateHud();
+    updateShopUI();
     deathOverlay.classList.add('hidden');
     startOverlay.classList.add('hidden');
     gameStarted = true;
@@ -876,9 +1032,15 @@
     keys[e.code] = true;
     if (e.code === 'KeyR') startReload();
     if (e.code === 'Digit1') switchWeapon('pistol');
-    if (e.code === 'Digit2') switchWeapon('rifle');
-    if (e.code === 'Digit3') switchWeapon('shotgun');
+    if (e.code === 'Digit2') switchWeapon('smg');
+    if (e.code === 'Digit3') switchWeapon('rifle');
+    if (e.code === 'Digit4') switchWeapon('shotgun');
+    if (e.code === 'Digit5') switchWeapon('sniper');
+    if (e.code === 'Digit6') switchWeapon('lmg');
+    if (e.code === 'Digit7') switchWeapon('melee');
     if (e.code === 'KeyQ') cycleWeapon(1);
+    if (e.code === 'KeyH') heal();
+    if (e.code === 'KeyB') toggleShop();
     if (e.code === 'Space') tryDodge();
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
@@ -1014,6 +1176,8 @@
   bindBtn('btn-dodge', function () { tryDodge(); });
   bindBtn('btn-pause', function () { togglePause(); });
   bindBtn('btn-sprint', function () { touch.sprint = true; });
+  bindBtn('btn-heal', function () { heal(); });
+  bindBtn('btn-shop', function () { toggleShop(); });
   const sprintBtn = document.getElementById('btn-sprint');
   if (sprintBtn) {
     sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
@@ -1066,6 +1230,67 @@
     if (running) pauseGame(); else resumeGame();
   }
 
+  /* ---------- 医疗包 / 商店 ---------- */
+  function heal() {
+    if (!player.alive || player.hp >= player.maxHp) return;
+    if (medkits <= 0) { showBanner('没有医疗包'); return; }
+    medkits--;
+    player.hp = Math.min(player.maxHp, player.hp + 50 * heroStats().healMult);
+    playSound('heal');
+    updateHud();
+    updateShopUI();
+  }
+  let shopOpen = false;
+  function toggleShop() {
+    if (!gameStarted || !player.alive) return;
+    const shop = document.getElementById('shop-overlay');
+    if (!shop) return;
+    shopOpen = !shopOpen;
+    if (shopOpen) {
+      running = false; firing = false;
+      shop.classList.remove('hidden');
+      updateShopUI();
+    } else {
+      shop.classList.add('hidden');
+      running = true;
+      if (!isTouch) requestLock();
+    }
+  }
+  function buyWeapon(type) {
+    const price = WEAPONS[type].price;
+    if (owned[type]) return;
+    if (coins < price) { playSound('noMoney'); showBanner('金币不足'); return; }
+    coins -= price;
+    owned[type] = true;
+    playSound('buy');
+    updateShopUI();
+    updateHud();
+  }
+  function buyMedkit() {
+    if (coins < 150) { playSound('noMoney'); showBanner('金币不足'); return; }
+    if (medkits >= 5) { showBanner('医疗包已满'); return; }
+    coins -= 150;
+    medkits++;
+    playSound('buy');
+    updateShopUI();
+    updateHud();
+  }
+  function updateShopUI() {
+    const c = document.getElementById('shop-coins');
+    if (c) c.textContent = coins;
+    const m = document.getElementById('shop-medkits');
+    if (m) m.textContent = medkits;
+    WEAPON_ORDER.forEach(function (t) {
+      if (t === 'pistol' || t === 'melee') return;
+      const btn = document.getElementById('buy-' + t);
+      if (!btn) return;
+      if (owned[t]) { btn.textContent = '已拥有'; btn.disabled = true; }
+      else { btn.textContent = '购买 ' + WEAPONS[t].price + ' 金币'; btn.disabled = false; }
+    });
+    const mb = document.getElementById('buy-medkit');
+    if (mb) mb.textContent = '医疗包 150 金币（拥有 ' + medkits + '）';
+  }
+
   document.addEventListener('pointerlockchange', function () {
     pointerLocked = (document.pointerLockElement === canvas || document.webkitPointerLockElement === canvas);
     if (pointerLocked && gameStarted && player.alive) {
@@ -1095,6 +1320,22 @@
   const viewTpsBtn = document.getElementById('view-tps');
   if (viewFpsBtn) viewFpsBtn.addEventListener('click', function () { setViewMode('fps'); });
   if (viewTpsBtn) viewTpsBtn.addEventListener('click', function () { setViewMode('tps'); });
+  WEAPON_ORDER.forEach(function (t) {
+    if (t === 'pistol' || t === 'melee') return;
+    const btn = document.getElementById('buy-' + t);
+    if (btn) btn.addEventListener('click', function () { buyWeapon(t); });
+  });
+  const buyMedBtn = document.getElementById('buy-medkit');
+  if (buyMedBtn) buyMedBtn.addEventListener('click', buyMedkit);
+  const shopCloseBtn = document.getElementById('shop-close');
+  if (shopCloseBtn) shopCloseBtn.addEventListener('click', function () { toggleShop(); });
+  document.querySelectorAll('#hero-row .hero-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      hero = b.getAttribute('data-hero');
+      applyHero();
+      document.querySelectorAll('#hero-row .hero-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
+    });
+  });
 
   window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1126,6 +1367,7 @@
     updateParticles(dt);
     updateTracers(dt);
     updateFlashes(dt);
+    updatePickups(dt);
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
     if (vop > 0) vignetteEl.style.opacity = Math.max(0, vop - dt * 2.2).toFixed(3);
@@ -1138,7 +1380,7 @@
 
     // 体力恢复
     const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touch.sprint;
-    if (!sprinting && dodgeT <= 0) player.stamina = Math.min(100, player.stamina + 16 * dt);
+    if (!sprinting && dodgeT <= 0) player.stamina = Math.min(player.maxStamina, player.stamina + 16 * dt);
 
     // 输入方向（键盘 + 触摸摇杆）
     let f = touch.f, s = touch.s;
@@ -1155,8 +1397,8 @@
     if (moveDir.lengthSq() > 0) moveDir.normalize();
 
     const canSprint = sprinting && f > 0 && player.stamina > 0;
-    let speed = 5.2;
-    if (canSprint) { speed = 8.6; player.stamina = Math.max(0, player.stamina - 22 * dt); }
+    let speed = heroStats().speed;
+    if (canSprint) { speed = heroStats().speed * 1.65; player.stamina = Math.max(0, player.stamina - 22 * dt); }
 
     // 加速度 / 摩擦
     const target = moveDir.clone().multiplyScalar(speed);
@@ -1207,14 +1449,17 @@
     recoilPitch += (0 - recoilPitch) * Math.min(1, 12 * dt);
     recoilZ += (0 - recoilZ) * Math.min(1, 12 * dt);
     recoilCam += (0 - recoilCam) * Math.min(1, 14 * dt);
+    meleeSwing = Math.max(0, meleeSwing - dt * 5);
     if (viewMode === 'tps') {
       weaponHolder.rotation.x = player.pitch + recoilPitch;
       weaponHolder.position.z = WEAPON_BASE.z - recoilZ;
+      if (currentWeapon === 'melee') armR.pivot.rotation.x = -meleeSwing * 1.3;
     } else {
       fpsRig.rotation.x = recoilPitch + Math.sin(bobT) * 0.03 * swing;
       fpsRig.position.z = FPS_BASE.z + recoilZ;
       fpsRig.position.x = FPS_BASE.x + Math.cos(bobT * 0.5) * 0.03 * swing;
       fpsRig.position.y = FPS_BASE.y + Math.sin(bobT) * 0.03 * swing;
+      fpsRig.rotation.z = (currentWeapon === 'melee' ? -meleeSwing * 0.8 : 0);
     }
 
     // 换弹 / 切枪计时
@@ -1319,9 +1564,13 @@
       this.hbFront.visible = false;
       score += this.cfg.score;
       kills += 1;
+      coins += Math.round(this.cfg.score / 2);
       hitmark(1);
       playSound('kill');
       burstSparks(this.group.position.clone().add(new THREE.Vector3(0, 1, 0)), this.cfg.color, 14);
+      const p = this.group.position.clone();
+      if (this.type === 'brute') dropLoot(p, Math.random() < 0.5 ? 'medkit' : 'ammo');
+      else dropLoot(p, null);
     }
   };
   function updateWaves(dt) {
