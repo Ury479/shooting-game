@@ -445,7 +445,7 @@
   const HEROES = {
     assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, scout:false, engineer:false, skill:'damage', shieldRegen:12 },
     tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, scout:false, engineer:false, skill:'shield', shieldRegen:16 },
-    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'speed', shieldRegen:10 },
+    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'weapon', shieldRegen:10 },
     medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, scout:false, engineer:false, skill:'heal', shieldRegen:20 },
     engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret', shieldRegen:10 },
     ninja: { name:'忍者', hp:100, speed:6.2, stamina:110, color:0x2b3a4a, dark:0x1a2633, healMult:1, dmgMult:1.5, resMult:1, scout:false, engineer:false, skill:'clone', shieldRegen:10 }
@@ -539,7 +539,7 @@
     return s;
   }
   function heroPerk(h) {
-    const skName = { damage:'伤害提升', shield:'附加护盾', speed:'移速提升', heal:'恢复生命', turret:'建造炮台', clone:'召唤影分身' }[h.skill] || '';
+    const skName = { damage:'伤害提升', shield:'附加护盾', speed:'移速提升', heal:'恢复生命', turret:'建造炮台', clone:'召唤影分身', weapon:'加特林/激光炮' }[h.skill] || '';
     let extra = '';
     if (h.dmgMult > 1) extra = ' · 被动伤害×' + h.dmgMult;
     else if (h.resMult < 1) extra = ' · 被动受伤×' + h.resMult;
@@ -889,6 +889,14 @@
     const h = heroStats();
     if (h.skill === 'turret') { buildTurret(); return; }
     if (h.skill === 'clone') { summonClones(); skillCd = 20; showBanner('召唤影分身！'); playSound('skill'); return; }
+    if (h.skill === 'weapon') {
+      if (tempWeapon === 'gatling') equipTemp('laser');
+      else if (tempWeapon === 'laser') equipTemp('gatling');
+      else equipTemp('gatling');
+      skillCd = 6;
+      playSound('skill');
+      return;
+    }
     if (skillCd > 0) { showBanner('技能冷却中'); return; }
     if (h.skill === 'damage') { dmgBuff = 1.5; buffT = 6; skillCd = 20; showBanner('伤害提升！(6s)'); playSound('skill'); }
     else if (h.skill === 'shield') { player.shield = Math.min(player.maxShield * 1.5, player.shield + 60); skillCd = 20; showBanner('+60 护盾'); playSound('skill'); }
@@ -1190,7 +1198,16 @@
   }
   function collectEquip(type) {
     if (type === 'mine') { mines += 2; showBanner('+2 地雷（X 放置）'); playSound('pickup'); }
-    else { tempWeapon = type; tempT = (type === 'saber' ? 30 : (type === 'gatling' ? 60 : 35)); tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; gatlingFireT = 0; if (type === 'saber') { invincT = (hero === 'ninja' ? 20 : 10); showBanner('光剑·无敌 ' + invincT + ' 秒！'); } else { showBanner('装备：' + TEMP_WEAPONS[type].name); } playSound('pickup'); applyView(); updateHudAmmo(); }
+    else equipTemp(type);
+  }
+  function equipTemp(type) {
+    tempWeapon = type;
+    tempT = (type === 'laser' && hero === 'scout') ? 45 : (type === 'saber' ? 30 : (type === 'gatling' ? 60 : 35));
+    tempHeat = 0; overheat = false; coolT = 0; reloadT = 0; gatlingFireT = 0;
+    if (type === 'saber') { invincT = (hero === 'ninja' ? 20 : 10); showBanner('光剑·无敌 ' + invincT + ' 秒！'); }
+    else if (type === 'laser' && hero === 'scout') showBanner('激光炮（时间延长）');
+    else showBanner('装备：' + TEMP_WEAPONS[type].name);
+    playSound('pickup'); applyView(); updateHudAmmo();
   }
   function placeMine() {
     if (!gameStarted || !player.alive || !running) return;
@@ -1233,20 +1250,30 @@
       const c = clones[i];
       c.life -= dt;
       if (c.life <= 0) { scene.remove(c.group); clones.splice(i, 1); continue; }
-      const ang = timeNow * 1.4 + i * 2;
-      c.group.position.set(player.pos.x + Math.cos(ang) * 2.2, Math.sin(timeNow * 4) * 0.05, player.pos.z + Math.sin(ang) * 2.2);
-      c.fireCd -= dt;
-      if (c.fireCd <= 0) {
-        let near = null, nd = 9;
-        enemies.forEach(function (e) { if (!e.alive || e.dying) return; const d = Math.hypot(e.group.position.x - c.group.position.x, e.group.position.z - c.group.position.z); if (d < nd) { nd = d; near = e; } });
-        if (near) {
-          c.fireCd = 0.9;
-          const f = c.group.position.clone(); f.y = 1.2;
-          const t = near.group.position.clone().add(new THREE.Vector3(0, 1, 0));
-          spawnTracer(f, t);
-          near.takeDamage(Math.round(14 * (1 + (worldWave() - 1) * 0.18)), null);
-          burstSparks(t, 0x35e0ff, 2);
+      let near = null, nd = 20;
+      enemies.forEach(function (e) { if (!e.alive || e.dying) return; const d = Math.hypot(e.group.position.x - c.group.position.x, e.group.position.z - c.group.position.z); if (d < nd) { nd = d; near = e; } });
+      if (near) {
+        const dx = near.group.position.x - c.group.position.x, dz = near.group.position.z - c.group.position.z;
+        const dd = Math.hypot(dx, dz) || 1;
+        if (dd > 1.8) {
+          c.group.position.x += dx / dd * 6 * dt;
+          c.group.position.z += dz / dd * 6 * dt;
+        } else {
+          c.fireCd -= dt;
+          c.group.rotation.y = Math.atan2(dx, dz);
+          if (c.fireCd <= 0) {
+            c.fireCd = 0.7;
+            const f = c.group.position.clone(); f.y = 1.2;
+            const t = near.group.position.clone().add(new THREE.Vector3(0, 1, 0));
+            spawnTracer(f, t);
+            near.takeDamage(Math.round(30 * (1 + (worldWave() - 1) * 0.15)), null);
+            burstSparks(t, 0x35e0ff, 3);
+            meleeSwing = 1;
+          }
         }
+      } else {
+        const ang = timeNow * 1.4 + i * 2;
+        c.group.position.set(player.pos.x + Math.cos(ang) * 2.2, 0, player.pos.z + Math.sin(ang) * 2.2);
       }
     }
   }
