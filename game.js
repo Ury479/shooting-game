@@ -396,6 +396,8 @@
     maxStamina: 100,
     vy: 0,
     onGround: true,
+    shield: 50,
+    maxShield: 50,
     alive: true
   };
   const keys = {};
@@ -403,11 +405,11 @@
 
   /* ---------- 英雄 / 货币 / 装备 ---------- */
   const HEROES = {
-    assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, regen:0, scout:false, engineer:false },
-    tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, regen:0, scout:false, engineer:false },
-    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, regen:0, scout:true, engineer:false },
-    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, regen:9, scout:false, engineer:false },
-    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, regen:0, scout:false, engineer:true }
+    assault:  { name:'突击手', hp:110, speed:5.2, stamina:100, color:0x2f6f8f, dark:0x1e4d68, healMult:1, dmgMult:1.3, resMult:1, scout:false, engineer:false, skill:'damage' },
+    tank:     { name:'重装兵', hp:175, speed:4.0, stamina:120, color:0xb0563a, dark:0x7a3a26, healMult:1, dmgMult:1, resMult:0.7, scout:false, engineer:false, skill:'shield' },
+    scout:    { name:'侦察兵', hp:95, speed:6.6, stamina:110, color:0x3a8f5f, dark:0x286240, healMult:1, dmgMult:1, resMult:1, scout:true, engineer:false, skill:'speed' },
+    medic:    { name:'医疗兵', hp:100, speed:5.2, stamina:100, color:0xe8e8e8, dark:0xb8b8b8, healMult:1.5, dmgMult:1, resMult:1, scout:false, engineer:false, skill:'heal' },
+    engineer: { name:'工程兵', hp:110, speed:4.8, stamina:110, color:0xd98a3a, dark:0x9a5a24, healMult:1, dmgMult:1, resMult:1, scout:false, engineer:true, skill:'turret' }
   };
   let hero = 'assault';
   let mode = 'endless';
@@ -416,6 +418,7 @@
   let meleeSwing = 0;
   let runStartCoins = 0;
   let lastHurtTime = -99;
+  let skillCd = 0, buffT = 0, dmgBuff = 1, spdBuff = 1;
   let currentLevel = 0;
   let saveUnlocked = 0;
   const owned = { pistol:true, smg:false, rifle:false, shotgun:false, sniper:false, lmg:false, melee:true };
@@ -482,17 +485,21 @@
   }
   function heroStats() { return HEROES[hero]; }
   function heroPerk(h) {
-    if (h.engineer) return '技能：建造炮台协助攻击（G）';
-    if (h.scout) return '加成：雷达预判刷怪地点（右下）· 移速快';
-    if (h.regen > 0) return '加成：脱战 3 秒自动回血，医疗包更有效';
-    if (h.dmgMult > 1) return '加成：武器伤害 ×' + h.dmgMult + '，突击主力';
-    if (h.resMult < 1) return '加成：受到伤害 ×' + h.resMult + '，高血量耐扛';
-    return '加成：均衡';
+    const skName = { damage:'伤害提升', shield:'附加护盾', speed:'移速提升', heal:'恢复生命', turret:'建造炮台' }[h.skill] || '';
+    let extra = '';
+    if (h.dmgMult > 1) extra = ' · 被动伤害×' + h.dmgMult;
+    else if (h.resMult < 1) extra = ' · 被动受伤×' + h.resMult;
+    else if (h.scout) extra = ' · 雷达预判刷怪';
+    else if (h.engineer) extra = ' · 自动炮台';
+    else if (h.healMult > 1) extra = ' · 医疗包×' + h.healMult;
+    return '技能[V]：' + skName + extra;
   }
   function applyHero() {
     const h = HEROES[hero];
     player.maxHp = h.hp;
     player.maxStamina = h.stamina;
+    player.maxShield = 50;
+    player.shield = 50;
     MAT.body.color.setHex(h.color);
     MAT.bodyDark.color.setHex(h.dark);
     const hd = document.getElementById('hero-desc');
@@ -809,6 +816,16 @@
   const MAX_TURRETS = 2, TURRET_INTERVAL = 0.8, TURRET_RANGE = 18;
   let turrets = [];
   let turretCooldown = 0;
+  function useHeroSkill() {
+    if (!gameStarted || !player.alive || !running) return;
+    if (skillCd > 0) { showBanner('技能冷却中'); return; }
+    const h = heroStats();
+    if (h.skill === 'turret') { buildTurret(); return; }
+    if (h.skill === 'damage') { dmgBuff = 1.5; buffT = 6; skillCd = 20; showBanner('伤害提升！(6s)'); playSound('skill'); }
+    else if (h.skill === 'shield') { player.shield = Math.min(player.maxShield * 1.5, player.shield + 60); skillCd = 20; showBanner('+60 护盾'); playSound('skill'); }
+    else if (h.skill === 'speed') { spdBuff = 1.4; buffT = 6; skillCd = 20; showBanner('移速提升！(6s)'); playSound('skill'); }
+    else if (h.skill === 'heal') { player.hp = Math.min(player.maxHp, player.hp + 60); skillCd = 20; showBanner('+60 生命'); playSound('skill'); }
+  }
   function buildTurret() {
     if (hero !== 'engineer') { showBanner('该英雄无炮台技能'); return; }
     if (!gameStarted || !player.alive || !running) return;
@@ -996,6 +1013,8 @@
       blip(90, 0.3, 0.6, 'sawtooth', -30);
     } else if (kind === 'jump') {
       blip(240, 0.1, 0.2, 'sine', 200);
+    } else if (kind === 'skill') {
+      blip(520, 0.08, 0.3, 'square', 300); blip(780, 0.12, 0.3, 'square', 300);
     }
   }
 
@@ -1034,7 +1053,7 @@
       if (dist < range + e.cfg.scale) {
         const toE = new THREE.Vector3(dx, 0, dz).normalize();
         if (fwd3.angleTo(toE) < 1.0) {
-          e.takeDamage(wStats('melee').damage * heroStats().dmgMult, toE);
+          e.takeDamage(wStats('melee').damage * heroStats().dmgMult * dmgBuff, toE);
           burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xffe6a0, 6);
           hitAny = true;
         }
@@ -1129,7 +1148,7 @@
 
       spawnTracer(muzzle, end);
       if (hitEnemy) {
-        hitEnemy.takeDamage(ws.damage * heroStats().dmgMult, dir);
+        hitEnemy.takeDamage(ws.damage * heroStats().dmgMult * dmgBuff, dir);
         hitmark(0);
         burstSparks(end, 0xffc46b, 3);
       } else {
@@ -1197,6 +1216,11 @@
   function damagePlayer(dmg) {
     if (!player.alive) return;
     dmg = Math.max(1, Math.round(dmg * heroStats().resMult));
+    if (player.shield > 0) {
+      const absorb = Math.min(player.shield, dmg);
+      player.shield -= absorb;
+      dmg -= absorb;
+    }
     player.hp -= dmg;
     lastHurtTime = timeNow;
     shake += 0.9;
@@ -1257,6 +1281,8 @@
   }
   function updateHud() {
     hpBar.style.width = Math.max(0, Math.round(player.hp / player.maxHp * 100)) + '%';
+    const sh = document.getElementById('sh-bar');
+    if (sh) sh.style.width = Math.max(0, Math.round(player.shield / player.maxShield * 100)) + '%';
     stBar.style.width = Math.max(0, Math.round(player.stamina / player.maxStamina * 100)) + '%';
     scoreEl.textContent = score;
     waveEl.textContent = Math.max(1, wave);
@@ -1284,7 +1310,7 @@
     WEAPON_ORDER.forEach(function (t) { ammo[t] = wStats(t).mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
-    lastHurtTime = -99; turretCooldown = 0;
+    lastHurtTime = -99; turretCooldown = 0; skillCd = 0; buffT = 0; dmgBuff = 1; spdBuff = 1;
     turrets.forEach(function (t) { scene.remove(t.group); });
     turrets.length = 0;
     currentWeapon = 'pistol';
@@ -1422,6 +1448,7 @@
     if (e.code === 'Space') { e.preventDefault(); jump(); }
     if (e.code === 'KeyC') tryDodge();
     if (e.code === 'KeyG') buildTurret();
+    if (e.code === 'KeyV') { e.preventDefault(); useHeroSkill(); }
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
   window.addEventListener('keyup', function (e) {
@@ -1560,6 +1587,7 @@
   bindBtn('btn-shop', function () { toggleShop(); });
   bindBtn('btn-jump', function () { jump(); });
   bindBtn('btn-turret', function () { buildTurret(); });
+  bindBtn('btn-skill', function () { useHeroSkill(); });
   const sprintBtn = document.getElementById('btn-sprint');
   if (sprintBtn) {
     sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
@@ -1788,11 +1816,14 @@
     // 体力恢复
     const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touch.sprint;
     if (!sprinting && dodgeT <= 0) player.stamina = Math.min(player.maxStamina, player.stamina + 16 * dt);
-    // 医疗兵：脱战 3 秒后自动回血
-    const hh = heroStats();
-    if (hh.regen > 0 && timeNow - lastHurtTime > 3 && player.hp < player.maxHp) {
-      player.hp = Math.min(player.maxHp, player.hp + hh.regen * dt);
+    // 护盾：脱战 3 秒后自动回复
+    if (timeNow - lastHurtTime > 3 && player.shield < player.maxShield) {
+      player.shield = Math.min(player.maxShield, player.shield + 12 * dt);
     }
+    // 技能 buff 计时 / 冷却
+    buffT = Math.max(0, buffT - dt);
+    if (buffT <= 0) { dmgBuff = 1; spdBuff = 1; }
+    if (skillCd > 0) skillCd -= dt;
     if (turretCooldown > 0) turretCooldown -= dt;
 
     // 输入方向（键盘 + 触摸摇杆）
@@ -1810,8 +1841,8 @@
     if (moveDir.lengthSq() > 0) moveDir.normalize();
 
     const canSprint = sprinting && f > 0 && player.stamina > 0;
-    let speed = heroStats().speed;
-    if (canSprint) { speed = heroStats().speed * 1.65; player.stamina = Math.max(0, player.stamina - 22 * dt); }
+    let speed = heroStats().speed * spdBuff;
+    if (canSprint) { speed = heroStats().speed * spdBuff * 1.65; player.stamina = Math.max(0, player.stamina - 22 * dt); }
 
     // 加速度 / 摩擦
     const target = moveDir.clone().multiplyScalar(speed);

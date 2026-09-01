@@ -137,6 +137,8 @@
   .radar-dot{position:absolute;width:7px;height:7px;border-radius:50%;background:#ff5e5e;opacity:0;transform:translate(-50%,-50%);box-shadow:0 0 4px rgba(255,95,95,.8);}
   .radar-dot.spawn{background:#35e0ff;box-shadow:0 0 4px rgba(53,224,255,.85);width:8px;height:8px;}
   #btn-turret{left:236px;bottom:170px;width:60px;height:60px;font-size:13px;}
+  #btn-skill{left:306px;bottom:170px;width:60px;height:60px;font-size:13px;}
+  #sh-bar{background:linear-gradient(90deg,#4aa8ff,#8fd6ff);}
 </style>
 </head>
 <body>
@@ -146,6 +148,8 @@
   <div id="top-left" class="panel">
     <div class="label">生命值</div>
     <div class="bar-wrap"><div id="hp-bar" class="bar"></div></div>
+    <div class="label" style="margin-top:8px;">护盾（自动恢复）</div>
+    <div class="bar-wrap"><div id="sh-bar" class="bar"></div></div>
     <div class="label" style="margin-top:8px;">体力（冲刺/翻滚）</div>
     <div class="bar-wrap"><div id="st-bar" class="bar"></div></div>
   </div>
@@ -167,6 +171,7 @@
       <span class="key">Shift</span> 冲刺
       <span class="key">空格</span> 翻滚
       <span class="key">Q</span> 快速切换
+      <span class="key">V</span> 技能
     </div>
   </div>
 </div>
@@ -243,6 +248,7 @@
   <button class="tbtn" id="btn-shop">商店</button>
   <button class="tbtn" id="btn-jump">跳跃</button>
   <button class="tbtn" id="btn-turret">炮台</button>
+  <button class="tbtn" id="btn-skill">技能</button>
 </div>
 
 <div id="shop-overlay" class="overlay hidden">
