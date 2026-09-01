@@ -12,6 +12,19 @@
   const CAM_DIST = 4.6;      // 相机距离
   const PLAYER_R = 0.45;     // 玩家碰撞半径
 
+  /* ---------- 难度 / 平衡 ---------- */
+  const DIFF = {
+    hpPerWave: 0.38,        // 每波敌人血量增幅
+    dmgPerWave: 0.15,       // 每波敌人伤害增幅
+    speedPerWave: 0.04,     // 每波敌人移速增幅
+    speedCap: 0.6,
+    baseCount: 7,           // 首波敌人数量
+    countPerWave: 3,        // 每波新增数量
+    healAmount: 40,         // 医疗包回复量
+    medkitCap: 3,           // 医疗包持有上限
+    medkitPrice: 200        // 医疗包价格
+  };
+
   /* ---------- DOM ---------- */
   const canvas = document.getElementById('game');
   const hpBar = document.getElementById('hp-bar');
@@ -281,12 +294,12 @@
 
   /* ---------- 武器配置 ---------- */
   const WEAPONS = {
-    pistol: { name:'手枪', key:1, auto:false, damage:26, interval:0.22, spread:0.012, pellets:1, mag:12, reserve:60, reload:0.9, recoil:0.16, kick:0.6, color:0xd9d9d9, price:0 },
-    smg:    { name:'冲锋枪', key:2, auto:true, damage:10, interval:0.055, spread:0.035, pellets:1, mag:40, reserve:240, reload:1.3, recoil:0.08, kick:0.45, color:0x3a7bd5, price:500 },
-    rifle:  { name:'突击步枪', key:3, auto:true, damage:15, interval:0.085, spread:0.025, pellets:1, mag:30, reserve:150, reload:1.5, recoil:0.1, kick:0.5, color:0x3a8f5f, price:800 },
-    shotgun:{ name:'霰弹枪', key:4, auto:false, damage:11, interval:0.75, spread:0.09, pellets:8, mag:6, reserve:36, reload:2.0, recoil:0.5, kick:1.4, color:0xb06a3a, price:900 },
-    sniper: { name:'狙击步枪', key:5, auto:false, damage:120, interval:1.15, spread:0.002, pellets:1, mag:5, reserve:25, reload:2.2, recoil:0.7, kick:2.2, color:0x5a5a6a, price:1200 },
-    lmg:    { name:'轻机枪', key:6, auto:true, damage:14, interval:0.08, spread:0.05, pellets:1, mag:100, reserve:300, reload:2.6, recoil:0.14, kick:0.6, color:0x8a5a3a, price:1500 },
+    pistol: { name:'手枪', key:1, auto:false, damage:26, interval:0.22, spread:0.012, pellets:1, mag:12, reserve:48, reload:0.9, recoil:0.16, kick:0.6, color:0xd9d9d9, price:0 },
+    smg:    { name:'冲锋枪', key:2, auto:true, damage:10, interval:0.055, spread:0.035, pellets:1, mag:40, reserve:200, reload:1.3, recoil:0.08, kick:0.45, color:0x3a7bd5, price:500 },
+    rifle:  { name:'突击步枪', key:3, auto:true, damage:15, interval:0.085, spread:0.025, pellets:1, mag:30, reserve:120, reload:1.5, recoil:0.1, kick:0.5, color:0x3a8f5f, price:800 },
+    shotgun:{ name:'霰弹枪', key:4, auto:false, damage:11, interval:0.75, spread:0.09, pellets:8, mag:6, reserve:30, reload:2.0, recoil:0.5, kick:1.4, color:0xb06a3a, price:900 },
+    sniper: { name:'狙击步枪', key:5, auto:false, damage:120, interval:1.15, spread:0.002, pellets:1, mag:5, reserve:20, reload:2.2, recoil:0.7, kick:2.2, color:0x5a5a6a, price:1200 },
+    lmg:    { name:'轻机枪', key:6, auto:true, damage:14, interval:0.08, spread:0.05, pellets:1, mag:100, reserve:240, reload:2.6, recoil:0.14, kick:0.6, color:0x8a5a3a, price:1500 },
     melee:  { name:'军刀', key:7, auto:false, damage:70, interval:0.5, spread:0, pellets:0, mag:1, reserve:1, reload:0, recoil:0, kick:0, color:0xcccccc, price:0, melee:true }
   };
   const WEAPON_ORDER = ['pistol','smg','rifle','shotgun','sniper','lmg','melee'];
@@ -501,7 +514,7 @@
   let reloadTimer = 0;
   let switchTimer = 0;
   const ammo = { pistol: 12, smg: 40, rifle: 30, shotgun: 6, sniper: 5, lmg: 100, melee: 1 };
-  const reserve = { pistol: 60, smg: 240, rifle: 150, shotgun: 36, sniper: 25, lmg: 300, melee: 1 };
+  const reserve = { pistol: 48, smg: 200, rifle: 120, shotgun: 30, sniper: 20, lmg: 240, melee: 1 };
   let lastShotAt = -10;
   let viewMode = 'fps';
 
@@ -596,10 +609,13 @@
     const meshes = [];
     grp.traverse(function (o) { if (o.isMesh && o.geometry) meshes.push(o); });
 
+    const waveScale = 1 + (wave - 1) * DIFF.hpPerWave;
     return {
       type, cfg, group: grp, meshes, bodyMesh: body,
-      hp: cfg.hp * (1 + (wave - 1) * 0.28),
-      maxHp: cfg.hp * (1 + (wave - 1) * 0.28),
+      hp: cfg.hp * waveScale,
+      maxHp: cfg.hp * waveScale,
+      dmgScale: 1 + (wave - 1) * DIFF.dmgPerWave,
+      spdScale: 1 + Math.min(DIFF.speedCap, (wave - 1) * DIFF.speedPerWave),
       walkPhase: Math.random() * Math.PI * 2,
       hitCooldown: 0,
       attackCooldown: Math.random() * 0.5,
@@ -624,11 +640,11 @@
 
   function pickEnemyType() {
     const r = Math.random();
-    if (wave >= 5 && r < 0.12) return 'flyer';
-    if (wave >= 4 && r < 0.26) return 'exploder';
-    if (wave >= 3 && r < 0.42) return 'shooter';
-    if (wave >= 3 && r < 0.56) return 'brute';
-    if (wave >= 2 && r < 0.78) return 'runner';
+    if (wave >= 4 && r < 0.14) return 'flyer';
+    if (wave >= 3 && r < 0.30) return 'exploder';
+    if (wave >= 2 && r < 0.48) return 'shooter';
+    if (wave >= 3 && r < 0.62) return 'brute';
+    if (wave >= 2 && r < 0.82) return 'runner';
     return 'walker';
   }
 
@@ -657,8 +673,8 @@
     if (!t) {
       const r = Math.random();
       if (r < 0.5) t = 'coin';
-      else if (r < 0.68) t = 'ammo';
-      else if (r < 0.82) t = 'medkit';
+      else if (r < 0.66) t = 'ammo';
+      else if (r < 0.74) t = 'medkit';
       else t = null;
     }
     if (t) spawnPickup(pos, t);
@@ -680,8 +696,8 @@
   }
   function collectPickup(type) {
     if (type === 'coin') { coins += 50; showBanner('+50 金币'); }
-    else if (type === 'medkit') { medkits = Math.min(5, medkits + 1); showBanner('获得医疗包'); }
-    else { WEAPON_ORDER.forEach(function (t) { if (owned[t]) reserve[t] = Math.min(999, reserve[t] + WEAPONS[t].mag); }); showBanner('弹药补充'); }
+    else if (type === 'medkit') { medkits = Math.min(DIFF.medkitCap, medkits + 1); showBanner('获得医疗包'); }
+    else { WEAPON_ORDER.forEach(function (t) { if (owned[t]) reserve[t] = Math.min(999, reserve[t] + Math.ceil(WEAPONS[t].mag / 2)); }); showBanner('弹药补充'); }
     playSound('pickup');
     updateHud();
     updateShopUI();
@@ -701,7 +717,7 @@
     wave = n;
     waveState = 'spawning';
     spawnQueue = [];
-    const count = 6 + n * 2;
+    const count = DIFF.baseCount + n * DIFF.countPerWave;
     enemyCount = count;
     for (let i = 0; i < count; i++) spawnQueue.push(pickEnemyType());
     spawnTimer = 0;
@@ -843,7 +859,7 @@
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshBasicMaterial({ color: color || 0xff5e5e }));
     mesh.position.copy(from);
     scene.add(mesh);
-    enemyBullets.push({ mesh: mesh, vel: dir.multiplyScalar(15), life: 3, dmg: dmg });
+    enemyBullets.push({ mesh: mesh, vel: dir.multiplyScalar(17), life: 3, dmg: dmg });
   }
   function updateEnemyBullets(dt) {
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
@@ -870,7 +886,7 @@
     e.hbBack.visible = false; e.hbFront.visible = false;
     const dx = player.pos.x - e.group.position.x;
     const dz = player.pos.z - e.group.position.z;
-    if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(e.cfg.explosion);
+    if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(e.cfg.explosion * e.dmgScale);
     burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
     shake += 0.9;
     playSound('explode');
@@ -1317,7 +1333,7 @@
     if (!player.alive || player.hp >= player.maxHp) return;
     if (medkits <= 0) { showBanner('没有医疗包'); return; }
     medkits--;
-    player.hp = Math.min(player.maxHp, player.hp + 50 * heroStats().healMult);
+    player.hp = Math.min(player.maxHp, player.hp + DIFF.healAmount * heroStats().healMult);
     playSound('heal');
     updateHud();
     updateShopUI();
@@ -1349,9 +1365,9 @@
     updateHud();
   }
   function buyMedkit() {
-    if (coins < 150) { playSound('noMoney'); showBanner('金币不足'); return; }
-    if (medkits >= 5) { showBanner('医疗包已满'); return; }
-    coins -= 150;
+    if (coins < DIFF.medkitPrice) { playSound('noMoney'); showBanner('金币不足'); return; }
+    if (medkits >= DIFF.medkitCap) { showBanner('医疗包已满'); return; }
+    coins -= DIFF.medkitPrice;
     medkits++;
     playSound('buy');
     updateShopUI();
@@ -1370,7 +1386,7 @@
       else { btn.textContent = '购买 ' + WEAPONS[t].price + ' 金币'; btn.disabled = false; }
     });
     const mb = document.getElementById('buy-medkit');
-    if (mb) mb.textContent = '医疗包 150 金币（拥有 ' + medkits + '）';
+    if (mb) mb.textContent = '医疗包 ' + DIFF.medkitPrice + ' 金币（拥有 ' + medkits + '）';
   }
 
   document.addEventListener('pointerlockchange', function () {
@@ -1594,7 +1610,7 @@
       }
       e.hitCooldown -= dt;
       e.attackCooldown -= dt;
-      e.walkPhase += dt * (4 + e.cfg.speed * 1.4);
+      e.walkPhase += dt * (4 + e.cfg.speed * e.spdScale * 1.4);
 
       // 朝向玩家并移动（按类型）
       const toP = new THREE.Vector3(player.pos.x - e.group.position.x, 0, player.pos.z - e.group.position.z);
@@ -1604,14 +1620,14 @@
 
       if (e.cfg.flyer) {
         e.group.position.y = 1.4 + Math.sin(e.walkPhase) * 0.25;
-        if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+        if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
       } else if (e.cfg.shooter) {
-        if (dist > 15) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
-        else if (dist < 7) e.group.position.addScaledVector(toP, -e.cfg.speed * dt);
+        if (dist > 15) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
+        else if (dist < 7) e.group.position.addScaledVector(toP, -e.cfg.speed * e.spdScale * dt);
       } else if (e.cfg.exploder) {
-        if (dist > 0.8) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+        if (dist > 0.8) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
       } else {
-        if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+        if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
       }
 
       // 障碍碰撞（飞行兵不撞）
@@ -1624,11 +1640,11 @@
       if (e.cfg.shooter) {
         e.fireCooldown -= dt;
         if (e.fireCooldown <= 0 && dist < 22 && player.alive) {
-          e.fireCooldown = 2.0;
+          e.fireCooldown = 1.6;
           fireEnemyBullet(
             e.group.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
             new THREE.Vector3(player.pos.x, player.pos.y + 1.05, player.pos.z),
-            e.cfg.damage, 0xff5e5e
+            e.cfg.damage * e.dmgScale, 0xff5e5e
           );
         }
       }
@@ -1639,8 +1655,8 @@
       // 近战攻击（地面怪无法打到高地；飞行兵俯冲可命中）
       const canMelee = !e.cfg.shooter && !e.cfg.exploder && (e.cfg.flyer ? (dist < 1.2 * e.cfg.scale) : (dist < 1.2 * e.cfg.scale && Math.abs(e.group.position.y - player.pos.y) < 1.3));
       if (canMelee && e.attackCooldown <= 0 && player.alive) {
-        e.attackCooldown = 1.0;
-        damagePlayer(e.cfg.damage);
+        e.attackCooldown = 0.85;
+        damagePlayer(e.cfg.damage * e.dmgScale);
         const knock = toP.clone().multiplyScalar(-3);
         e.group.position.add(knock);
       }
@@ -1694,6 +1710,14 @@
       hitmark(1);
       playSound('kill');
       burstSparks(this.group.position.clone().add(new THREE.Vector3(0, 1, 0)), this.cfg.color, 14);
+      // 自爆兵被击杀也会爆炸
+      if (this.cfg.exploder) {
+        const ex = this.group.position;
+        const dx = player.pos.x - ex.x, dz = player.pos.z - ex.z;
+        if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(this.cfg.explosion * this.dmgScale);
+        burstSparks(this.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
+        playSound('explode');
+      }
       const p = this.group.position.clone();
       if (this.type === 'brute') dropLoot(p, Math.random() < 0.5 ? 'medkit' : 'ammo');
       else dropLoot(p, null);
@@ -1704,7 +1728,7 @@
       spawnTimer -= dt;
       if (spawnTimer <= 0 && spawnQueue.length > 0) {
         spawnEnemy(spawnQueue.shift());
-        spawnTimer = Math.max(0.25, 1.0 - wave * 0.05);
+        spawnTimer = Math.max(0.18, 1.0 - wave * 0.06);
       }
       if (spawnQueue.length === 0) waveState = 'fighting';
     } else if (waveState === 'fighting') {
