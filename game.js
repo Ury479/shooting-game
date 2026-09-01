@@ -636,12 +636,13 @@
   /* ---------- 敌人 ---------- */
   const enemies = [];
   const ENEMY_TYPES = {
-    walker:   { hp: 60, speed: 3.2, damage: 12, scale: 1.0, color: 0xe74c3c, score: 100, name: '突击兵' },
-    runner:   { hp: 34, speed: 6.4, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者' },
-    brute:    { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵' },
-    shooter:  { hp: 50, speed: 2.2, damage: 12, scale: 0.9, color: 0x16a085, score: 200, name: '射手', shooter: true },
-    exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 35, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', exploder: true },
-    flyer:    { hp: 70, speed: 4.6, damage: 10, scale: 0.8, color: 0x3498db, score: 220, name: '飞行兵', flyer: true }
+    walker:   { hp: 60, speed: 3.2, damage: 12, scale: 1.0, color: 0xe74c3c, score: 100, name: '突击兵', coin: 50 },
+    runner:   { hp: 34, speed: 6.4, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者', coin: 70 },
+    brute:    { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵', coin: 150 },
+    shooter:  { hp: 50, speed: 2.2, damage: 12, scale: 0.9, color: 0x2ecc71, score: 200, name: '射手(绿)', coin: 200, shooter: true },
+    exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 35, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', coin: 90, exploder: true },
+    flyer:    { hp: 70, speed: 4.6, damage: 10, scale: 0.8, color: 0x3498db, score: 220, name: '飞行兵', coin: 120, flyer: true },
+    boss:     { hp: 700, speed: 1.2, damage: 55, scale: 2.6, color: 0x1a1a22, score: 800, name: '巨型Boss', coin: 1000, boss: true }
   };
 
   function makeEnemy(type) {
@@ -681,6 +682,14 @@
     grp.traverse(function (o) { if (o.isMesh) o.userData.enemy = true; });
     scene.add(grp);
 
+    let ring = null;
+    if (cfg.boss) {
+      ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 4.2, 40), new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.visible = false;
+      scene.add(ring);
+    }
+
     const meshes = [];
     grp.traverse(function (o) { if (o.isMesh && o.geometry) meshes.push(o); });
 
@@ -699,6 +708,7 @@
       exploded: false,
       alive: true,
       legPivots, armPivots, hbBack, hbFront,
+      ring: ring, charging: false, chargeT: 0, attackT: 3,
       dieScale: s
     };
   }
@@ -872,8 +882,11 @@
     const count = DIFF.baseCount + n * DIFF.countPerWave;
     enemyCount = count;
     for (let i = 0; i < count; i++) spawnQueue.push(pickEnemyType());
+    const campBoss = (mode === 'campaign' && currentLevel >= 3 && n === LEVELS[currentLevel].waves);
+    const endBoss = (mode === 'endless' && wave >= 5 && wave % 5 === 0);
+    if (campBoss || endBoss) { spawnQueue.push('boss'); enemyCount++; }
     spawnTimer = 0;
-    showBanner(mode === 'campaign' ? 'Lv.' + (currentLevel + 1) + ' 第 ' + n + ' 波' : '第 ' + n + ' 波');
+    showBanner((campBoss || endBoss) ? '⚠ BOSS 来袭 ⚠' : (mode === 'campaign' ? 'Lv.' + (currentLevel + 1) + ' 第 ' + n + ' 波' : '第 ' + n + ' 波'));
     waveEl.textContent = n;
   }
 
@@ -1042,7 +1055,7 @@
     burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
     shake += 0.9;
     playSound('explode');
-    score += e.cfg.score; kills += 1; coins += Math.round(e.cfg.score / 2);
+    score += e.cfg.score; kills += 1; coins += (e.cfg.coin || Math.round(e.cfg.score / 2));
     saveGame(); updateShopUI(); updateMenuUI();
     dropLoot(e.group.position.clone(), 'coin');
   }
@@ -1239,7 +1252,7 @@
     player.hp = player.maxHp; player.stamina = player.maxStamina; player.alive = true;
     player.pos.set(0, 0, 0); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
     player.vy = 0; player.onGround = true;
-    enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); });
+    enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); if (e.ring) scene.remove(e.ring); });
     enemies.length = 0;
     WEAPON_ORDER.forEach(function (t) { ammo[t] = wStats(t).mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
@@ -1269,7 +1282,7 @@
     const earned = Math.max(0, coins - runStartCoins);
     saveGame();
     document.exitPointerLock && document.exitPointerLock();
-    showMainMenu('战败 · 坚持到第 ' + wave + ' 波 · 本局 +' + earned + ' 金币');
+    showMainMenu(mode === 'campaign' ? '关卡失败 · 回到选关（第 ' + wave + ' 波）' : '战败 · 坚持到第 ' + wave + ' 波 · 本局 +' + earned + ' 金币');
   }
   function showMainMenu(notice) {
     gameStarted = false;
@@ -1877,7 +1890,7 @@
         grp.rotation.x = Math.max(-Math.PI / 2, grp.rotation.x - 3.2 * dt);
         grp.position.y += dt * 0.5;
         const sc = grp.scale.x - 1.4 * dt * e.dieScale;
-        if (sc <= 0.02) { scene.remove(grp); scene.remove(e.hbBack); scene.remove(e.hbFront); enemies.splice(i, 1); }
+        if (sc <= 0.02) { scene.remove(grp); scene.remove(e.hbBack); scene.remove(e.hbFront); if (e.ring) scene.remove(e.ring); enemies.splice(i, 1); }
         else grp.scale.setScalar(sc);
         continue;
       }
@@ -1899,12 +1912,40 @@
         else if (dist < 7) e.group.position.addScaledVector(toP, -e.cfg.speed * e.spdScale * dt);
       } else if (e.cfg.exploder) {
         if (dist > 0.8) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
-      } else {
+      } else if (!e.cfg.boss) {
         if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
       }
 
-      // 障碍碰撞（飞行兵不撞）
-      if (!e.cfg.flyer) {
+      // 巨型 Boss：缓慢逼近 + 蓄力震地（需跳跃/走位躲避）
+      if (e.cfg.boss) {
+        e.attackT -= dt;
+        if (e.charging) {
+          e.chargeT -= dt;
+          if (e.ring) {
+            e.ring.visible = true;
+            const rr = 1 + (1 - e.chargeT / 0.9) * 3.4;
+            e.ring.scale.set(rr, rr, rr);
+            e.ring.position.set(e.group.position.x, 0.08, e.group.position.z);
+            e.ring.material.opacity = 0.3 + 0.3 * Math.sin(timeNow * 18);
+          }
+          if (e.chargeT <= 0) {
+            if (e.ring) e.ring.visible = false;
+            const dxp = player.pos.x - e.group.position.x, dzp = player.pos.z - e.group.position.z;
+            if (Math.hypot(dxp, dzp) < 4.4 && player.pos.y < 1.0 && player.alive) damagePlayer(e.cfg.damage);
+            burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0xffb020, 18);
+            shake += 0.7;
+            playSound('explode');
+            e.charging = false;
+          }
+        } else {
+          if (e.ring) e.ring.visible = false;
+          if (dist > 2.5 && player.alive) e.group.position.addScaledVector(toP, e.cfg.speed * e.spdScale * dt);
+          if (e.attackT <= 0 && dist < 11 && player.alive) { e.charging = true; e.chargeT = 0.9; e.attackT = 4.5; }
+        }
+      }
+
+      // 障碍碰撞（飞行兵 / Boss 不撞）
+      if (!e.cfg.flyer && !e.cfg.boss) {
         const p2 = e.group.position;
         pushOutOfObstacles(p2, 0.5 * e.cfg.scale);
       }
@@ -1926,7 +1967,7 @@
       if (e.cfg.exploder && dist < 2.4 && player.alive) { explodeEnemy(e); continue; }
 
       // 近战攻击（地面怪无法打到高地；飞行兵俯冲可命中）
-      const canMelee = !e.cfg.shooter && !e.cfg.exploder && (e.cfg.flyer ? (dist < 1.2 * e.cfg.scale) : (dist < 1.2 * e.cfg.scale && Math.abs(e.group.position.y - player.pos.y) < 1.3));
+      const canMelee = !e.cfg.shooter && !e.cfg.exploder && !e.cfg.boss && (e.cfg.flyer ? (dist < 1.2 * e.cfg.scale) : (dist < 1.2 * e.cfg.scale && Math.abs(e.group.position.y - player.pos.y) < 1.3));
       if (canMelee && e.attackCooldown <= 0 && player.alive) {
         e.attackCooldown = 0.85;
         damagePlayer(e.cfg.damage * e.dmgScale);
@@ -1979,7 +2020,7 @@
       this.hbFront.visible = false;
       score += this.cfg.score;
       kills += 1;
-      coins += Math.round(this.cfg.score / 2);
+      coins += (this.cfg.coin || Math.round(this.cfg.score / 2));
       saveGame(); updateShopUI(); updateMenuUI();
       hitmark(1);
       playSound('kill');
@@ -1993,7 +2034,8 @@
         playSound('explode');
       }
       const p = this.group.position.clone();
-      if (this.type === 'brute') dropLoot(p, Math.random() < 0.5 ? 'medkit' : 'ammo');
+      if (this.type === 'boss') { dropLoot(p, 'medkit'); dropLoot(p, 'ammo'); }
+      else if (this.type === 'brute') dropLoot(p, Math.random() < 0.5 ? 'medkit' : 'ammo');
       else dropLoot(p, null);
     }
   };
