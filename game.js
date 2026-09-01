@@ -495,6 +495,8 @@
     player.maxStamina = h.stamina;
     MAT.body.color.setHex(h.color);
     MAT.bodyDark.color.setHex(h.dark);
+    const hd = document.getElementById('hero-desc');
+    if (hd) hd.textContent = heroPerk(h);
   }
 
   /* ---------- 设备 / 输入适配 ---------- */
@@ -790,7 +792,12 @@
   }
   function collectPickup(type) {
     if (type === 'coin') { coins += 50; showBanner('+50 金币'); }
-    else if (type === 'medkit') { medkits = Math.min(DIFF.medkitCap, medkits + 1); showBanner('获得医疗包'); }
+    else if (type === 'medkit') {
+      const hh = heroStats();
+      const healAmt = Math.round(DIFF.healAmount * hh.healMult);
+      player.hp = Math.min(player.maxHp, player.hp + healAmt);
+      showBanner('医疗包 +' + healAmt + ' 血');
+    }
     else { WEAPON_ORDER.forEach(function (t) { if (owned[t]) reserve[t] = Math.min(999, reserve[t] + Math.ceil(WEAPONS[t].mag / 2)); }); showBanner('弹药补充'); }
     playSound('pickup');
     saveGame();
@@ -1718,6 +1725,7 @@
       hero = b.getAttribute('data-hero');
       applyHero();
       document.querySelectorAll('#hero-row .hero-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
+      updateMenuUI();
     });
   });
   const modeEnd = document.getElementById('mode-endless');
