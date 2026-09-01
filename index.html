@@ -110,6 +110,7 @@
   .shop-btn:disabled{opacity:.5;cursor:default;}
   #btn-heal{left:26px;bottom:170px;width:60px;height:60px;font-size:13px;}
   #btn-shop{left:96px;bottom:170px;width:60px;height:60px;font-size:13px;}
+  #btn-jump{left:166px;bottom:170px;width:60px;height:60px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -155,12 +156,14 @@
     <div class="sub">FIREFRONT · 3D 射击生存</div>
     <div class="controls">
       <div><span>移动</span><span class="k">W A S D</span></div>
-      <div><span>瞄准 / 视角</span><span class="k">鼠标</span></div>
-      <div><span>射击</span><span class="k">鼠标左键</span></div>
-      <div><span>切换武器</span><span class="k">1 / 2 / 3 / Q</span></div>
+      <div><span>视角 / 瞄准</span><span class="k">鼠标</span></div>
+      <div><span>射击 / 近战</span><span class="k">鼠标左键</span></div>
+      <div><span>切换武器</span><span class="k">1–7 / Q</span></div>
+      <div><span>跳跃</span><span class="k">空格</span></div>
+      <div><span>翻滚闪避</span><span class="k">C</span></div>
       <div><span>换弹</span><span class="k">R</span></div>
       <div><span>冲刺</span><span class="k">Shift</span></div>
-      <div><span>翻滚闪避</span><span class="k">空格</span></div>
+      <div><span>商店 / 医疗</span><span class="k">B / H</span></div>
       <div><span>暂停</span><span class="k">Esc</span></div>
     </div>
     <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
@@ -208,6 +211,7 @@
   <button class="tbtn" id="btn-pause">暂停</button>
   <button class="tbtn" id="btn-heal">医疗</button>
   <button class="tbtn" id="btn-shop">商店</button>
+  <button class="tbtn" id="btn-jump">跳跃</button>
 </div>
 
 <div id="shop-overlay" class="overlay hidden">

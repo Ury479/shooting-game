@@ -132,7 +132,8 @@
       [9, 9, 2.4, 2.4, 2.6], [-9, 7, 3.2, 2, 2.2], [11, -8, 2.4, 2.4, 3.2],
       [-10, -10, 2.8, 2.8, 2.2], [18, 4, 2.2, 3.4, 2.4], [-18, -3, 3.4, 2.2, 2.6],
       [4, 18, 2.6, 2.6, 2.2], [-5, -18, 3, 2.2, 2.8], [22, -18, 2.4, 2.4, 2.2],
-      [-24, 14, 2.8, 2.8, 2.4], [0, -27, 3.4, 2.4, 2.6], [-15, 22, 2.4, 2.4, 2.2]
+      [-24, 14, 2.8, 2.8, 2.4], [0, -27, 3.4, 2.4, 2.6], [-15, 22, 2.4, 2.4, 2.2],
+      [12, 2, 4, 4, 1.4], [-12, -2, 4, 4, 1.5], [3, 12, 4, 4, 1.3], [-3, -12, 3.5, 3.5, 1.4]
     ];
     pts.forEach(function (p, i) {
       addObstacle(p[0], p[1], p[2], p[3], p[4], palette[i % palette.length]);
@@ -379,6 +380,8 @@
     maxHp: 100,
     stamina: 100,
     maxStamina: 100,
+    vy: 0,
+    onGround: true,
     alive: true
   };
   const keys = {};
@@ -545,9 +548,12 @@
   /* ---------- 敌人 ---------- */
   const enemies = [];
   const ENEMY_TYPES = {
-    walker: { hp: 60, speed: 3.2, damage: 12, scale: 1.0, color: 0xe74c3c, score: 100, name: '突击兵' },
-    runner: { hp: 34, speed: 6.4, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者' },
-    brute:  { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵' }
+    walker:   { hp: 60, speed: 3.2, damage: 12, scale: 1.0, color: 0xe74c3c, score: 100, name: '突击兵' },
+    runner:   { hp: 34, speed: 6.4, damage: 8, scale: 0.78, color: 0xf5a623, score: 150, name: '疾行者' },
+    brute:    { hp: 220, speed: 1.9, damage: 26, scale: 1.6, color: 0x9b59b6, score: 300, name: '重装兵' },
+    shooter:  { hp: 50, speed: 2.2, damage: 12, scale: 0.9, color: 0x16a085, score: 200, name: '射手', shooter: true },
+    exploder: { hp: 40, speed: 5.4, damage: 0, explosion: 35, scale: 0.85, color: 0xff7b00, score: 250, name: '自爆兵', exploder: true },
+    flyer:    { hp: 70, speed: 4.6, damage: 10, scale: 0.8, color: 0x3498db, score: 220, name: '飞行兵', flyer: true }
   };
 
   function makeEnemy(type) {
@@ -597,6 +603,8 @@
       walkPhase: Math.random() * Math.PI * 2,
       hitCooldown: 0,
       attackCooldown: Math.random() * 0.5,
+      fireCooldown: 1.5,
+      exploded: false,
       alive: true,
       legPivots, armPivots, hbBack, hbFront,
       dieScale: s
@@ -616,8 +624,11 @@
 
   function pickEnemyType() {
     const r = Math.random();
-    if (wave >= 3 && r < 0.16) return 'brute';
-    if (wave >= 2 && r < 0.42) return 'runner';
+    if (wave >= 5 && r < 0.12) return 'flyer';
+    if (wave >= 4 && r < 0.26) return 'exploder';
+    if (wave >= 3 && r < 0.42) return 'shooter';
+    if (wave >= 3 && r < 0.56) return 'brute';
+    if (wave >= 2 && r < 0.78) return 'runner';
     return 'walker';
   }
 
@@ -774,6 +785,10 @@
       blip(500, 0.12, 0.3, 'sine', 300);
     } else if (kind === 'noMoney') {
       blip(180, 0.12, 0.3, 'square', -60);
+    } else if (kind === 'explode') {
+      blip(90, 0.3, 0.6, 'sawtooth', -30);
+    } else if (kind === 'jump') {
+      blip(240, 0.1, 0.2, 'sine', 200);
     }
   }
 
@@ -819,6 +834,48 @@
       }
     });
     if (hitAny) { hitmark(0); playSound('meleeHit'); } else { playSound('melee'); }
+  }
+
+  /* ---------- 敌人子弹 / 自爆 ---------- */
+  const enemyBullets = [];
+  function fireEnemyBullet(from, to, dmg, color) {
+    const dir = to.clone().sub(from).normalize();
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshBasicMaterial({ color: color || 0xff5e5e }));
+    mesh.position.copy(from);
+    scene.add(mesh);
+    enemyBullets.push({ mesh: mesh, vel: dir.multiplyScalar(15), life: 3, dmg: dmg });
+  }
+  function updateEnemyBullets(dt) {
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      const b = enemyBullets[i];
+      b.life -= dt;
+      b.mesh.position.addScaledVector(b.vel, dt);
+      const chest = new THREE.Vector3(player.pos.x, player.pos.y + 1.05, player.pos.z);
+      if (b.mesh.position.distanceTo(chest) < 0.7 && player.alive) {
+        damagePlayer(b.dmg);
+        burstSparks(b.mesh.position, 0xff5e5e, 4);
+        scene.remove(b.mesh); enemyBullets.splice(i, 1);
+        continue;
+      }
+      if (b.mesh.position.y <= 0.06 || b.life <= 0) {
+        burstSparks(b.mesh.position, 0xff5e5e, 3);
+        scene.remove(b.mesh); enemyBullets.splice(i, 1);
+      }
+    }
+  }
+  function explodeEnemy(e) {
+    if (!e.alive || e.exploded) return;
+    e.exploded = true;
+    e.dying = true;
+    e.hbBack.visible = false; e.hbFront.visible = false;
+    const dx = player.pos.x - e.group.position.x;
+    const dz = player.pos.z - e.group.position.z;
+    if (dx * dx + dz * dz < 11.6 && player.alive) damagePlayer(e.cfg.explosion);
+    burstSparks(e.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff7b00, 22);
+    shake += 0.9;
+    playSound('explode');
+    score += e.cfg.score; kills += 1; coins += Math.round(e.cfg.score / 2);
+    dropLoot(e.group.position.clone(), 'coin');
   }
 
   function tryFire() {
@@ -956,6 +1013,23 @@
       }
     });
   }
+  function playerObstaclePush() {
+    obstacles.forEach(function (o) {
+      if (player.pos.y >= o.h - 0.05) return;                    // 站在顶部，不推
+      if (player.vy > 0 && (o.h - player.pos.y) < 2.0) return;   // 向上跳向可达的顶，放行
+      const cx = Math.max(o.x - o.hw, Math.min(player.pos.x, o.x + o.hw));
+      const cz = Math.max(o.z - o.hd, Math.min(player.pos.z, o.z + o.hd));
+      let dx = player.pos.x - cx, dz = player.pos.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < PLAYER_R * PLAYER_R) {
+        let d = Math.sqrt(d2);
+        if (d < 0.001) { dx = 0; dz = 1; d = 1; }
+        const push = (PLAYER_R - d) / d;
+        player.pos.x += dx * push;
+        player.pos.z += dz * push;
+      }
+    });
+  }
 
   /* ---------- 屏幕震动 ---------- */
   let shake = 0;
@@ -1041,7 +1115,8 @@
     if (e.code === 'KeyQ') cycleWeapon(1);
     if (e.code === 'KeyH') heal();
     if (e.code === 'KeyB') toggleShop();
-    if (e.code === 'Space') tryDodge();
+    if (e.code === 'Space') { e.preventDefault(); jump(); }
+    if (e.code === 'KeyC') tryDodge();
     if (e.code === 'Escape') { e.preventDefault(); togglePause(); }
   });
   window.addEventListener('keyup', function (e) {
@@ -1178,14 +1253,21 @@
   bindBtn('btn-sprint', function () { touch.sprint = true; });
   bindBtn('btn-heal', function () { heal(); });
   bindBtn('btn-shop', function () { toggleShop(); });
+  bindBtn('btn-jump', function () { jump(); });
   const sprintBtn = document.getElementById('btn-sprint');
   if (sprintBtn) {
     sprintBtn.addEventListener('touchend', function () { touch.sprint = false; });
     sprintBtn.addEventListener('touchcancel', function () { touch.sprint = false; });
   }
 
-  // 翻滚
+  // 跳跃 / 翻滚
   let dodgeT = 0, dodgeCd = 0;
+  function jump() {
+    if (!running || !player.alive || !player.onGround) return;
+    player.vy = 9.0;
+    player.onGround = false;
+    playSound('jump');
+  }
   function tryDodge() {
     if (!running || !player.alive) return;
     if (dodgeT > 0 || dodgeCd > 0 || player.stamina < 20) return;
@@ -1368,6 +1450,7 @@
     updateTracers(dt);
     updateFlashes(dt);
     updatePickups(dt);
+    updateEnemyBullets(dt);
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
     if (vop > 0) vignetteEl.style.opacity = Math.max(0, vop - dt * 2.2).toFixed(3);
@@ -1408,6 +1491,21 @@
     player.pos.x += player.vel.x * dt;
     player.pos.z += player.vel.z * dt;
 
+    // 重力与垂直移动
+    const prevY = player.pos.y;
+    if (player.onGround) player.vy = 0;
+    player.vy -= 20 * dt;
+    player.pos.y += player.vy * dt;
+    player.onGround = false;
+    if (player.pos.y <= 0) { player.pos.y = 0; player.vy = 0; player.onGround = true; }
+    if (player.pos.y > 0) {
+      obstacles.forEach(function (o) {
+        if (player.pos.x > o.x - o.hw && player.pos.x < o.x + o.hw && player.pos.z > o.z - o.hd && player.pos.z < o.z + o.hd) {
+          if (prevY >= o.h - 0.2 && player.pos.y <= o.h) { player.pos.y = o.h; player.vy = 0; player.onGround = true; }
+        }
+      });
+    }
+
     // 翻滚计时
     if (dodgeT > 0) dodgeT -= dt;
     if (dodgeCd > 0) dodgeCd -= dt;
@@ -1416,7 +1514,7 @@
     const b = BOUND;
     player.pos.x = Math.max(-b, Math.min(b, player.pos.x));
     player.pos.z = Math.max(-b, Math.min(b, player.pos.z));
-    pushOutOfObstacles(player.pos, PLAYER_R);
+    playerObstaclePush();
 
     playerRoot.position.copy(player.pos);
 
@@ -1427,7 +1525,7 @@
     const swing = moving ? speedRatio : 0;
     const amp = 0.7 * swing;
 
-    playerRoot.position.y = Math.abs(Math.sin(bobT)) * 0.09 * swing;
+    playerRoot.position.y = player.pos.y + Math.abs(Math.sin(bobT)) * 0.09 * swing;
     legL.pivot.rotation.x = Math.sin(bobT) * amp;
     legR.pivot.rotation.x = Math.sin(bobT + Math.PI) * amp;
     armL.pivot.rotation.x = Math.sin(bobT + Math.PI) * amp * 0.8;
@@ -1439,7 +1537,7 @@
     bodyNode.rotation.x = lean + (dodgeT > 0 ? 0.5 : 0);
     if (dodgeT > 0) {
       playerRoot.rotation.z = 0;
-      playerRoot.position.y = 0.25;
+      playerRoot.position.y = player.pos.y + 0.25;
     }
 
     // 面向移动/射击方向（第三人称时身体背对相机）
@@ -1498,21 +1596,49 @@
       e.attackCooldown -= dt;
       e.walkPhase += dt * (4 + e.cfg.speed * 1.4);
 
-      // 朝向玩家并靠近
+      // 朝向玩家并移动（按类型）
       const toP = new THREE.Vector3(player.pos.x - e.group.position.x, 0, player.pos.z - e.group.position.z);
       const dist = toP.length();
-      if (dist > 0.001) {
-        toP.normalize();
-        e.group.rotation.y = Math.atan2(toP.x, toP.z);
+      if (dist > 0.001) toP.normalize();
+      e.group.rotation.y = (dist > 0.001) ? Math.atan2(toP.x, toP.z) : e.group.rotation.y;
+
+      if (e.cfg.flyer) {
+        e.group.position.y = 1.4 + Math.sin(e.walkPhase) * 0.25;
+        if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+      } else if (e.cfg.shooter) {
+        if (dist > 15) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+        else if (dist < 7) e.group.position.addScaledVector(toP, -e.cfg.speed * dt);
+      } else if (e.cfg.exploder) {
+        if (dist > 0.8) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
+      } else {
         if (dist > 1.0) e.group.position.addScaledVector(toP, e.cfg.speed * dt);
       }
 
-      // 障碍碰撞
-      const p2 = e.group.position;
-      pushOutOfObstacles(p2, 0.5 * e.cfg.scale);
+      // 障碍碰撞（飞行兵不撞）
+      if (!e.cfg.flyer) {
+        const p2 = e.group.position;
+        pushOutOfObstacles(p2, 0.5 * e.cfg.scale);
+      }
 
-      // 攻击玩家
-      if (dist < 1.2 * e.cfg.scale && e.attackCooldown <= 0 && player.alive) {
+      // 射手远程射击
+      if (e.cfg.shooter) {
+        e.fireCooldown -= dt;
+        if (e.fireCooldown <= 0 && dist < 22 && player.alive) {
+          e.fireCooldown = 2.0;
+          fireEnemyBullet(
+            e.group.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+            new THREE.Vector3(player.pos.x, player.pos.y + 1.05, player.pos.z),
+            e.cfg.damage, 0xff5e5e
+          );
+        }
+      }
+
+      // 自爆兵接近后爆炸
+      if (e.cfg.exploder && dist < 2.4 && player.alive) { explodeEnemy(e); continue; }
+
+      // 近战攻击（地面怪无法打到高地；飞行兵俯冲可命中）
+      const canMelee = !e.cfg.shooter && !e.cfg.exploder && (e.cfg.flyer ? (dist < 1.2 * e.cfg.scale) : (dist < 1.2 * e.cfg.scale && Math.abs(e.group.position.y - player.pos.y) < 1.3));
+      if (canMelee && e.attackCooldown <= 0 && player.alive) {
         e.attackCooldown = 1.0;
         damagePlayer(e.cfg.damage);
         const knock = toP.clone().multiplyScalar(-3);
