@@ -1104,6 +1104,8 @@
     player.alive = false;
     running = false;
     firing = false;
+    shake = 0;
+    recoilCam = 0;
     finalScoreEl.textContent = score;
     finalWaveEl.textContent = wave;
     finalKillsEl.textContent = kills;
@@ -1462,11 +1464,13 @@
       updateEnemies(dt);
       updateWaves(dt);
     }
-    updateParticles(dt);
-    updateTracers(dt);
-    updateFlashes(dt);
-    updatePickups(dt);
-    updateEnemyBullets(dt);
+    if (player.alive) {
+      updateParticles(dt);
+      updateTracers(dt);
+      updateFlashes(dt);
+      updatePickups(dt);
+      updateEnemyBullets(dt);
+    }
     // 受击红幕淡出
     const vop = parseFloat(vignetteEl.style.opacity || '0');
     if (vop > 0) vignetteEl.style.opacity = Math.max(0, vop - dt * 2.2).toFixed(3);
@@ -1767,8 +1771,8 @@
       camera.rotation.z = 0;
     }
 
-    // 屏幕震动
-    if (shake > 0.001) {
+    // 屏幕震动（死亡后冻结，避免结算画面抖动）
+    if (player.alive && shake > 0.001) {
       shake = Math.max(0, shake - dt * 6);
       const amp = shake * 0.12;
       camera.position.x += (Math.random() - 0.5) * amp;
