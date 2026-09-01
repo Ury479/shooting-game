@@ -357,7 +357,11 @@
   let firing = false;
 
   /* ---------- 设备 / 输入适配 ---------- */
-  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  // 触屏检测：只在「粗指针/无悬停」的真触屏设备启用触屏，避免 Mac 触控板被误判
+  const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const noHover = !!(window.matchMedia && window.matchMedia('(hover: none)').matches);
+  const hasTouch = ('ontouchstart' in window);
+  const isTouch = coarse || (hasTouch && noHover) || (hasTouch && !window.matchMedia && navigator.maxTouchPoints > 0);
   document.body.classList.toggle('touch', isTouch);
   const touch = { f: 0, s: 0, sprint: false };   // 虚拟摇杆输入
   let pointerLocked = false;
