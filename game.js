@@ -451,17 +451,35 @@
   const ammo = { pistol: 12, rifle: 30, shotgun: 6 };
   const reserve = { pistol: 60, rifle: 150, shotgun: 36 };
   let lastShotAt = -10;
+  let viewMode = 'fps';
 
-  function currentGun() { return fpsGuns[currentWeapon]; }
+  function applyView() {
+    playerRoot.visible = (viewMode === 'tps');
+    fpsRig.visible = (viewMode === 'fps');
+    WEAPON_ORDER.forEach(function (t) {
+      gunGroups[t].visible = (viewMode === 'tps' && t === currentWeapon);
+      fpsGuns[t].visible = (viewMode === 'fps' && t === currentWeapon);
+    });
+  }
+  function setViewMode(m) {
+    if (viewMode === m) return;
+    viewMode = m;
+    applyView();
+    const f = document.getElementById('view-fps');
+    const t = document.getElementById('view-tps');
+    if (f) f.classList.toggle('active', viewMode === 'fps');
+    if (t) t.classList.toggle('active', viewMode === 'tps');
+  }
+
+  function currentGun() { return (viewMode === 'tps') ? gunGroups[currentWeapon] : fpsGuns[currentWeapon]; }
   function currentCfg() { return WEAPONS[currentWeapon]; }
 
   function switchWeapon(type) {
     if (type === currentWeapon || switchTimer > 0) return;
-    WEAPON_ORDER.forEach(function (t) { fpsGuns[t].visible = false; });
     currentWeapon = type;
     reloading = false;
     reloadTimer = 0;
-    fpsGuns[type].visible = true;
+    applyView();
     switchTimer = 0.22;
     updateHudAmmo();
     playSound('switch');
@@ -1073,6 +1091,10 @@
     running = true;
     if (isTouch) enterFullscreen(); else requestLock();
   });
+  const viewFpsBtn = document.getElementById('view-fps');
+  const viewTpsBtn = document.getElementById('view-tps');
+  if (viewFpsBtn) viewFpsBtn.addEventListener('click', function () { setViewMode('fps'); });
+  if (viewTpsBtn) viewTpsBtn.addEventListener('click', function () { setViewMode('tps'); });
 
   window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1178,17 +1200,22 @@
       playerRoot.position.y = 0.25;
     }
 
-    // 面向移动/射击方向
-    bodyNode.rotation.y = player.yaw;
+    // 面向移动/射击方向（第三人称时身体背对相机）
+    bodyNode.rotation.y = player.yaw + (viewMode === 'tps' ? Math.PI : 0);
 
-    // 第一人称武器：后坐回弹 + 走路摆动
+    // 武器后坐回弹（按视角作用到对应枪）
     recoilPitch += (0 - recoilPitch) * Math.min(1, 12 * dt);
     recoilZ += (0 - recoilZ) * Math.min(1, 12 * dt);
     recoilCam += (0 - recoilCam) * Math.min(1, 14 * dt);
-    fpsRig.rotation.x = recoilPitch + Math.sin(bobT) * 0.03 * swing;
-    fpsRig.position.z = FPS_BASE.z + recoilZ;
-    fpsRig.position.x = FPS_BASE.x + Math.cos(bobT * 0.5) * 0.03 * swing;
-    fpsRig.position.y = FPS_BASE.y + Math.sin(bobT) * 0.03 * swing;
+    if (viewMode === 'tps') {
+      weaponHolder.rotation.x = player.pitch + recoilPitch;
+      weaponHolder.position.z = WEAPON_BASE.z - recoilZ;
+    } else {
+      fpsRig.rotation.x = recoilPitch + Math.sin(bobT) * 0.03 * swing;
+      fpsRig.position.z = FPS_BASE.z + recoilZ;
+      fpsRig.position.x = FPS_BASE.x + Math.cos(bobT * 0.5) * 0.03 * swing;
+      fpsRig.position.y = FPS_BASE.y + Math.sin(bobT) * 0.03 * swing;
+    }
 
     // 换弹 / 切枪计时
     if (reloading) {
@@ -1317,15 +1344,29 @@
     }
   }
 
-  /* ---------- 相机（第一人称） ---------- */
+  /* ---------- 相机（第一/第三人称可切换） ---------- */
   const EYE_HEIGHT = 1.62;
 
   function updateCamera(dt) {
-    camera.position.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = player.yaw;
-    camera.rotation.x = player.pitch + recoilCam;
-    camera.rotation.z = 0;
+    if (viewMode === 'tps') {
+      const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+      camera.position.set(
+        player.pos.x + Math.sin(player.yaw) * cp * CAM_DIST,
+        player.pos.y + 1.55 + sp * CAM_DIST,
+        player.pos.z + Math.cos(player.yaw) * cp * CAM_DIST
+      );
+      camera.lookAt(
+        player.pos.x - Math.sin(player.yaw) * cp * 30,
+        player.pos.y + 1.55 + sp * 30,
+        player.pos.z - Math.cos(player.yaw) * cp * 30
+      );
+    } else {
+      camera.position.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = player.yaw;
+      camera.rotation.x = player.pitch + recoilCam;
+      camera.rotation.z = 0;
+    }
 
     // 屏幕震动
     if (shake > 0.001) {
@@ -1340,9 +1381,8 @@
   }
 
   /* ---------- 启动渲染循环 ---------- */
-  // 初始显示步枪（第一人称）
-  WEAPON_ORDER.forEach(function (t) { fpsGuns[t].visible = false; });
-  fpsGuns.rifle.visible = true;
+  // 初始：第一人称，显示步枪
+  applyView();
   updateHudAmmo();
   updateHud();
   animate();

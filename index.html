@@ -96,6 +96,11 @@
     .card{padding:24px 20px;}
     .card h1{font-size:28px;}
   }
+  /* 视角设置 */
+  .view-row{display:flex;gap:12px;justify-content:center;margin:16px 0 20px;}
+  .view-btn{padding:10px 22px;font-size:15px;font-weight:700;border-radius:10px;border:1px solid rgba(140,190,255,.35);background:rgba(255,255,255,.06);color:#cfe0f5;cursor:pointer;letter-spacing:2px;}
+  .view-btn.active{background:linear-gradient(90deg,#35e0ff,#7fffd4);color:#04121a;border-color:transparent;}
+  .view-note{color:#8fa7cc;font-size:12px;letter-spacing:1px;margin-top:12px;}
 </style>
 </head>
 <body>
@@ -150,6 +155,7 @@
     </div>
     <div id="touch-hint">左侧摇杆移动 · 右侧滑动瞄准 · 开火键射击 · 按钮换枪/换弹/翻滚/冲刺</div>
     <button id="start-btn">开 始 游 戏</button>
+    <div class="view-note">默认第一人称 · 暂停菜单可切换第三人称</div>
   </div>
 </div>
 
@@ -157,6 +163,10 @@
   <div class="card">
     <h1 style="font-size:30px;">已暂停</h1>
     <div class="sub">点击下方按钮继续战斗</div>
+    <div class="view-row">
+      <button id="view-fps" class="view-btn active">第一人称</button>
+      <button id="view-tps" class="view-btn">第三人称</button>
+    </div>
     <button id="resume-btn" class="card" style="padding:12px 40px;background:linear-gradient(90deg,#35e0ff,#7fffd4);border:none;border-radius:12px;font-size:18px;font-weight:800;color:#04121a;cursor:pointer;letter-spacing:3px;">继 续</button>
   </div>
 </div>
