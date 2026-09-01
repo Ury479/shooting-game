@@ -8,7 +8,7 @@
   'use strict';
 
   /* ---------- 基础常量 ---------- */
-  const BOUND = 46;          // 场地半径
+  const BOUND = 75;          // 场地半径（已扩大）
   const CAM_DIST = 4.6;      // 相机距离
   const PLAYER_R = 0.45;     // 玩家碰撞半径
 
@@ -140,20 +140,30 @@
     obstacleMeshes.push(mesh);
     obstacles.push({ x, z, hw: w / 2, hd: d / 2, mesh });
   }
-  function scatterObstacles() {
-    const palette = [0x7a5a3a, 0x8a6a44, 0x5b4a72, 0x4a6a5a, 0x7a4a4a];
-    const pts = [
-      [9, 9, 2.4, 2.4, 2.6], [-9, 7, 3.2, 2, 2.2], [11, -8, 2.4, 2.4, 3.2],
-      [-10, -10, 2.8, 2.8, 2.2], [18, 4, 2.2, 3.4, 2.4], [-18, -3, 3.4, 2.2, 2.6],
-      [4, 18, 2.6, 2.6, 2.2], [-5, -18, 3, 2.2, 2.8], [22, -18, 2.4, 2.4, 2.2],
-      [-24, 14, 2.8, 2.8, 2.4], [0, -27, 3.4, 2.4, 2.6], [-15, 22, 2.4, 2.4, 2.2],
-      [12, 2, 4, 4, 1.4], [-12, -2, 4, 4, 1.5], [3, 12, 4, 4, 1.3], [-3, -12, 3.5, 3.5, 1.4]
-    ];
-    pts.forEach(function (p, i) {
-      addObstacle(p[0], p[1], p[2], p[3], p[4], palette[i % palette.length]);
-    });
+  function clearObstacles() {
+    obstacles.forEach(function (o) { scene.remove(o.mesh); });
+    obstacles.length = 0; obstacleMeshes.length = 0;
   }
-  scatterObstacles();
+  function buildMap() {
+    clearObstacles();
+    const palette = [0x7a5a3a, 0x8a6a44, 0x5b4a72, 0x4a6a5a, 0x7a4a4a, 0x6a7a8a, 0x7a5a4a];
+    // 随机散布箱子（高地/掩体混合，不同地形）
+    for (let i = 0; i < 16; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 10 + Math.random() * 55;
+      const x = Math.cos(ang) * dist, z = Math.sin(ang) * dist;
+      if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
+      const isPlat = Math.random() < 0.45;
+      const w = isPlat ? (3 + Math.random() * 3) : (2 + Math.random() * 2.6);
+      const d = isPlat ? (3 + Math.random() * 3) : (2 + Math.random() * 2.6);
+      const hh = isPlat ? (1.2 + Math.random() * 0.6) : (2.4 + Math.random() * 1.2);
+      addObstacle(x, z, w, d, hh, palette[i % palette.length]);
+    }
+    // 固定可跳平台（废墟建筑顶）
+    const plats = [[13, 4, 5, 5, 1.5], [-14, 6, 5, 5, 1.6], [6, -15, 5, 5, 1.4], [-8, -12, 5, 5, 1.5], [20, -5, 6, 6, 1.7], [-21, -3, 6, 6, 1.6], [2, 20, 5, 5, 1.5], [-3, -22, 5, 5, 1.6]];
+    plats.forEach(function (p, i) { addObstacle(p[0], p[1], p[2], p[3], p[4], palette[(i + 3) % palette.length]); });
+  }
+  buildMap();
 
   /* ---------- 粒子（火花 / 尘土 / 弹壳） ---------- */
   function makeGlowTexture() {
@@ -1546,6 +1556,7 @@
     player.vy = 0; player.onGround = true;
     enemies.forEach(function (e) { scene.remove(e.group); scene.remove(e.hbBack); scene.remove(e.hbFront); if (e.ring) scene.remove(e.ring); });
     enemies.length = 0;
+    buildMap();
     WEAPON_ORDER.forEach(function (t) { ammo[t] = wStats(t).mag; reserve[t] = WEAPONS[t].reserve; });
     reloading = false; reloadTimer = 0; switchTimer = 0;
     dodgeT = 0; dodgeCd = 0; shake = 0; meleeSwing = 0;
@@ -1648,7 +1659,7 @@
       const row = document.createElement('div');
       row.className = 'upg-row';
       row.id = 'upg-' + t;
-      row.innerHTML = '<span>' + WEAPONS[t].name + '</span><span class="upg-level">Lv.0</span><span class="upg-cost">升级 300 金币</span><button class="upg-btn shop-btn">升级</button>';
+      row.innerHTML = '<span>' + WEAPONS[t].name + '</span><span class="upg-stats"></span><span class="upg-level">Lv.0</span><span class="upg-cost">升级 300 金币</span><button class="upg-btn shop-btn">升级</button>';
       const btn = row.querySelector('.upg-btn');
       if (btn) btn.addEventListener('click', function () { upgradeWeapon(t); });
       list.appendChild(row);
@@ -1669,6 +1680,13 @@
       if (!row) return;
       const lvl = row.querySelector('.upg-level'); if (lvl) lvl.textContent = 'Lv.' + (upgrades[t] || 0);
       const cost = row.querySelector('.upg-cost'); if (cost) cost.textContent = '升级 ' + upgradeCost(t) + ' 金币';
+      const stats = row.querySelector('.upg-stats');
+      if (stats) {
+        const ws2 = wStats(t), nl = (upgrades[t] || 0) + 1;
+        const nd = Math.round(WEAPONS[t].damage * (1 + nl * 0.15));
+        const nm = Math.round(WEAPONS[t].mag * (1 + nl * 0.2));
+        stats.textContent = (t === 'melee') ? '伤害' + ws2.damage + '→' + nd : '伤害' + ws2.damage + '→' + nd + ' · 弹药' + ws2.mag + '→' + nm;
+      }
       const btn = row.querySelector('.upg-btn');
       if (btn) { btn.disabled = !owned[t] || coins < upgradeCost(t); btn.textContent = owned[t] ? '升级' : '未拥有'; }
     });
